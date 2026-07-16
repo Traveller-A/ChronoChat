@@ -231,7 +231,10 @@ function selectMention(member) {
 
 function renderContent(content) {
   if (!content) return ''
-  return content.replace(/@([\w\u4e00-\u9fff]+)/g, '<span class="mention">@$1</span>')
+  // Replace "Me" placeholder with user name
+  let text = content.replace(/Me/g, userName.value)
+  // Highlight @mentions
+  return text.replace(/@([\w\u4e00-\u9fff]+)/g, '<span class="mention">@$1</span>')
 }
 
 // ---- Send ----
