@@ -129,4 +129,53 @@ export function getChatHistory(id, mode = 'chat') {
   return apiClient.get(`/characters/${encodeURIComponent(id)}/history`, { params: { mode } })
 }
 
+// ============================================================
+// Group API - 群聊管理
+// ============================================================
+
+/** 获取群聊列表 */
+export function listGroups() {
+  return apiClient.get('/groups')
+}
+
+/** 获取单个群聊详情 */
+export function getGroup(id) {
+  return apiClient.get(`/groups/${encodeURIComponent(id)}`)
+}
+
+/** 创建群聊 */
+export function createGroup(data) {
+  return apiClient.post('/groups', data)
+}
+
+/** 更新群聊 */
+export function updateGroup(id, data) {
+  return apiClient.put(`/groups/${encodeURIComponent(id)}`, data)
+}
+
+/** 删除群聊 */
+export function deleteGroup(id) {
+  return apiClient.delete(`/groups/${encodeURIComponent(id)}`)
+}
+
+/** 添加群聊成员 */
+export function addGroupMember(id, charId) {
+  return apiClient.post(`/groups/${encodeURIComponent(id)}/members`, { char_id: charId })
+}
+
+/** 移除群聊成员 */
+export function removeGroupMember(id, charId) {
+  return apiClient.delete(`/groups/${encodeURIComponent(id)}/members/${encodeURIComponent(charId)}`)
+}
+
+/** 发送群聊消息 */
+export function sendGroupMessage(id, message, senderId = '') {
+  return apiClient.post(`/groups/${encodeURIComponent(id)}/chat`, { message, sender_id: senderId })
+}
+
+/** 获取群聊历史 */
+export function getGroupHistory(id) {
+  return apiClient.get(`/groups/${encodeURIComponent(id)}/history`)
+}
+
 export default apiClient

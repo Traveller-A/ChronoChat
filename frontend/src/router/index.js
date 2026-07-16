@@ -43,7 +43,31 @@ const routes = [
     component: () => import('@/views/CharacterInfoPage.vue'),
     meta: { title: 'ChronoChat - 角色信息' }
   },
-  // 后续页面路由将在各 Phase 中添加
+  // ---- 群聊路由 ----
+  {
+    path: '/groupchats',
+    name: 'GroupChatList',
+    component: () => import('@/views/GroupChatListPage.vue'),
+    meta: { title: 'ChronoChat - 群聊列表' }
+  },
+  {
+    path: '/groupchats/create',
+    name: 'GroupChatCreate',
+    component: () => import('@/views/GroupChatCreatePage.vue'),
+    meta: { title: 'ChronoChat - 创建群聊' }
+  },
+  {
+    path: '/groupchats/:id/chat',
+    name: 'GroupChat',
+    component: () => import('@/views/GroupChatPage.vue'),
+    meta: { title: 'ChronoChat - 群聊' }
+  },
+  {
+    path: '/groupchats/:id/manage',
+    name: 'GroupManage',
+    component: () => import('@/views/GroupManagePage.vue'),
+    meta: { title: 'ChronoChat - 群聊管理' }
+  },
 ]
 
 const router = createRouter({

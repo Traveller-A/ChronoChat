@@ -22,6 +22,7 @@ set(API_SOURCES
     src/api/hello_controller.cpp
     src/api/config_controller.cpp
     src/api/character_controller.cpp
+    src/api/group_controller.cpp
 )
 
 set(WS_SOURCES
@@ -32,6 +33,7 @@ set(SERVICE_SOURCES
     src/services/character_service.cpp
     src/services/memory_service.cpp
     src/services/ai_service.cpp
+    src/services/group_service.cpp
 )
 
 set(MODEL_SOURCES
