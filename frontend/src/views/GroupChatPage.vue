@@ -134,14 +134,28 @@ function switchMode(mode) {
 }
 
 // ---- Auto dialogue loop ----
+let autoIdleTimer = null
+
 function startAutoLoop() {
   stopAutoLoop()
   if (chatMode.value !== 'auto') return
-  autoTimer = setTimeout(runAutoStep, 2500)
+  // Start with a 3s delay to give user time to read
+  autoTimer = setTimeout(runAutoStep, 3000)
 }
 
 function stopAutoLoop() {
   if (autoTimer) { clearTimeout(autoTimer); autoTimer = null }
+  if (autoIdleTimer) { clearTimeout(autoIdleTimer); autoIdleTimer = null }
+}
+
+function resetIdleTimer() {
+  // Reset the idle timer: user just interacted, so pause auto chain for a while
+  if (autoIdleTimer) { clearTimeout(autoIdleTimer); autoIdleTimer = null }
+  autoIdleTimer = setTimeout(() => {
+    if (chatMode.value === 'auto' && !autoPaused) {
+      startAutoLoop()
+    }
+  }, 6000) // 6s idle before characters continue among themselves
 }
 
 async function runAutoStep() {
@@ -160,13 +174,14 @@ async function runAutoStep() {
           time: now
         })
         await scrollBottom()
-        // Continue loop quickly
-        autoTimer = setTimeout(runAutoStep, 2000)
+        // After one character speaks, stop chain. Let idle timer continue if user is silent.
+        stopAutoLoop()
+        resetIdleTimer()
       } else if (d.action === 'wait') {
-        // Wait longer before checking again
-        autoTimer = setTimeout(runAutoStep, 4000)
+        stopAutoLoop()
+        resetIdleTimer()
       } else {
-        // pause or other — stop
+        // pause or other — stop completely
         if (d.reason) {
           messages.value.push({ role: 'system', content: '[对话暂停] ' + d.reason, time: nowTime() })
         }
@@ -251,10 +266,11 @@ async function send() {
   finally {
     waiting.value = false
     await scrollBottom()
-    // Resume auto loop if in auto mode
+    // In auto mode, reset idle timer (characters may respond after 6s of user silence)
     if (chatMode.value === 'auto') {
       autoPaused = false
-      startAutoLoop()
+      stopAutoLoop()
+      resetIdleTimer()
     }
   }
 }
@@ -271,6 +287,7 @@ async function scrollBottom() {
 
 function goBack() {
   stopAutoLoop()
+  if (autoIdleTimer) clearTimeout(autoIdleTimer)
   router.push('/groupchats')
 }
 
@@ -320,6 +337,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   stopAutoLoop()
+  if (autoIdleTimer) clearTimeout(autoIdleTimer)
 })
 </script>
 
