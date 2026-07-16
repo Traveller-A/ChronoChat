@@ -302,7 +302,8 @@ void GroupController::chat(const drogon::HttpRequestPtr& req, std::function<void
                           << "- The user @" << targetName << " to get your attention. The message above is directed at you.\n"
                           << "- Respond naturally as your character would in a group setting — you're speaking to everyone in the chat.\n"
                           << "- Keep your response brief (1-3 sentences). This is a fast-paced group chat, not a letter.\n"
-                          << "- You can address other group members by name if relevant to the conversation.\n"
+                          << "- Do NOT repeat or quote messages from the chat history. Only write your NEW response.\n"
+                          << "- You can address other group members by name if relevant.\n"
                           << "- Reference past events from your memories and chat history when relevant.\n"
                           << "- Stay in character at all times.\n"
                           << "- Do NOT include roleplay markers like *action* or [narrative].";
@@ -470,6 +471,7 @@ void GroupController::autoStep(const drogon::HttpRequestPtr& req, std::function<
                       << "- You are a member of this group chat, alongside: " << mList.str() << ".\n"
                       << "- You've been selected to speak. Respond naturally in character.\n"
                       << "- Keep your response brief (1-3 sentences). This is a fast-paced group chat.\n"
+                      << "- Do NOT repeat or quote messages from the chat history. Only write your NEW response.\n"
                       << "- You can address other members by name if relevant.\n"
                       << "- Reference past events from memories and chat history when relevant.\n"
                       << "- Stay in character at all times.\n"
