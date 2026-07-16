@@ -16,10 +16,6 @@
       <div v-if="waiting" class="msg typing">对方正在输入...</div>
     </div>
     <div class="input-bar">
-      <el-select v-model="senderId" size="small" style="width:120px">
-        <el-option label="我" value="" />
-        <el-option v-for="m in members" :key="m.id" :label="m.name" :value="m.id" />
-      </el-select>
       <el-input v-model="text" placeholder="输入消息..." @keyup.enter="send" :disabled="waiting" />
       <el-button type="primary" @click="send" :disabled="waiting || !text.trim()">发送</el-button>
     </div>
@@ -41,7 +37,6 @@ const group = ref({})
 const members = ref([])
 const messages = ref([])
 const text = ref('')
-const senderId = ref('')
 const waiting = ref(false)
 const loading = ref(true)
 const mc = ref(null)
@@ -76,14 +71,11 @@ async function send() {
   const msg = text.value.trim()
   if (!msg || waiting.value) return
   text.value = ''
-  const sName = senderId.value
-    ? (members.value.find(m => m.id === senderId.value) || {}).name || 'Unknown'
-    : '我'
-  messages.value.push({ sender: sName, content: msg })
+  messages.value.push({ sender: '我', content: msg })
   waiting.value = true
   await scrollBottom()
   try {
-    const res = await sendGroupMessage(gid, msg, senderId.value || '')
+    const res = await sendGroupMessage(gid, msg, '')
     if (res.code === 0 && res.data.reply) {
       messages.value.push({ sender: res.data.responder_name || 'AI', content: res.data.reply })
     }
