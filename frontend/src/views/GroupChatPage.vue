@@ -80,7 +80,7 @@
 import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ArrowLeft, Promotion, ChatDotRound, Connection, InfoFilled } from '@element-plus/icons-vue'
-import { getGroup, getGroupHistory, sendGroupMessage, getAvatarUrl, autoStep, setGroupMode } from '@/api'
+import { getGroup, getGroupHistory, sendGroupMessage, getAvatarUrl, autoStep, setGroupMode, getConfig } from '@/api'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -99,6 +99,7 @@ const inputRef = ref(null)
 const chatMode = ref('mention')
 const showMentionList = ref(false)
 const mentionFilter = ref('')
+const userName = ref('旅人')  // default
 let autoTimer = null
 let autoPaused = false
 
@@ -240,7 +241,7 @@ async function send() {
   showMentionList.value = false
   text.value = ''
   const now = nowTime()
-  messages.value.push({ role: 'user', sender: 'Me', senderId: '', content: msg, time: now })
+  messages.value.push({ role: 'user', sender: userName.value, senderId: '', content: msg, time: now })
 
   // In auto mode, pause auto-loop while waiting for manual response
   if (chatMode.value === 'auto') {
@@ -293,7 +294,10 @@ function goBack() {
 
 onMounted(async () => {
   try {
-    const [gr, hr] = await Promise.all([getGroup(gid), getGroupHistory(gid)])
+    const [gr, hr, cfg] = await Promise.all([getGroup(gid), getGroupHistory(gid), getConfig()])
+    if (cfg.code === 0 && cfg.data && cfg.data.user_name) {
+      userName.value = cfg.data.user_name
+    }
     if (gr.code === 0) {
       group.value = gr.data
       members.value = gr.data.member_details || []
@@ -317,7 +321,7 @@ onMounted(async () => {
           const member = members.value.find(mb => mb.name === senderName)
           messages.value.push({
             role: isUser ? 'user' : 'char',
-            sender: senderName,
+            sender: isUser ? userName.value : senderName,
             senderId: member ? member.id : '',
             content,
             time: ''
