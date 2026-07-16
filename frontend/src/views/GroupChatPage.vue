@@ -317,7 +317,7 @@ onMounted(async () => {
             messages.value.push({ role: 'system', sender: 'Admin', content, time: '' })
             return
           }
-          const isUser = (senderName === 'Me')
+          const isUser = (senderName === 'Me' || senderName === userName.value)
           const member = members.value.find(mb => mb.name === senderName)
           messages.value.push({
             role: isUser ? 'user' : 'char',

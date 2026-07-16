@@ -190,13 +190,13 @@ void GroupController::chat(const drogon::HttpRequestPtr& req, std::function<void
     auto memberIds = GroupService::instance().getMemberIds(id);
 
     // Determine sender display name
-    std::string senderName = "Me";
+    std::string senderName = ConfigManager::instance().getUserName();
     if (!senderId.empty()) {
         auto c = CharacterService::instance().getCharacter(senderId);
         if (!c.id.empty()) senderName = c.name;
     }
 
-    // Append user message to chat log
+    // Append user/character message to chat log
     std::string logEntry = "[" + senderName + "]: " + message;
     GroupService::instance().appendChatLog(id, logEntry);
 
@@ -304,9 +304,6 @@ void GroupController::chat(const drogon::HttpRequestPtr& req, std::function<void
 
                 std::ostringstream sysPrompt;
                 sysPrompt << "=== Group Chat Context ===\n"
-                          << "CRITICAL: The human user's name is '" << userName << "'. "
-                          << "ALWAYS address them as '" << userName << "'. "
-                          << "NEVER call them 'Me' — 'Me' is just an internal display label, not a name.\n\n"
                           << "You are " << targetName << ", and you are currently in a group chat.\n"
                           << "Group members: " << memberList.str() << "\n"
                           << "The user '" << userName << "' is also in this group.\n"
@@ -494,9 +491,6 @@ void GroupController::autoStep(const drogon::HttpRequestPtr& req, std::function<
 
             std::ostringstream sysPrompt;
             sysPrompt << "=== Group Chat Context ===\n"
-                      << "CRITICAL: The human user's name is '" << userName << "'. "
-                      << "ALWAYS address them as '" << userName << "'. "
-                      << "NEVER call them 'Me' — 'Me' is just an internal display label, not a name.\n\n"
                       << "You are " << character << ", and you are currently in a group chat.\n"
                       << "Group members: " << mList.str() << "\n"
                       << "The user '" << userName << "' is also in this group.\n"
