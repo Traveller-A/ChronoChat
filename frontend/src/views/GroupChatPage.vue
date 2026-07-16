@@ -18,10 +18,10 @@
       <el-tag :type="statusTagType" size="small">{{ statusText }}</el-tag>
     </div>
 
-    <!-- 自动模式提示横幅 -->
+    <!-- 自动模式横幅 -->
     <div v-if="chatMode === 'auto'" class="auto-banner">
       <el-icon><InfoFilled /></el-icon>
-      自动对话模式将在后续阶段实现，当前仅为 @提及模式
+      自动对话模式 — 管理员智能体调度角色发言，你可随时插话或 @管理员 设置规则
     </div>
 
     <!-- 消息区域 -->
@@ -32,7 +32,12 @@
       </div>
 
       <template v-for="(m, i) in messages" :key="i">
-        <div :class="['msg-row', m.role === 'user' ? 'msg-user' : 'msg-char']">
+        <!-- 系统消息（管理员） -->
+        <div v-if="m.role === 'system'" class="system-msg">
+          <span class="system-text">{{ m.content }}</span>
+        </div>
+        <!-- 聊天气泡 -->
+        <div v-else :class="['msg-row', m.role === 'user' ? 'msg-user' : 'msg-char']">
           <el-avatar v-if="m.role === 'char'" :size="36" :src="getMemberAvatar(m.senderId)" class="msg-avatar">
             {{ m.sender?.charAt(0) }}
           </el-avatar>
@@ -57,28 +62,14 @@
     <!-- 底部输入 -->
     <div class="input-bar">
       <div class="input-wrapper">
-        <!-- @自动补全下拉 -->
         <div v-if="showMentionList" class="mention-list">
-          <div
-            v-for="m in filteredMembers"
-            :key="m.id"
-            class="mention-item"
-            @click="selectMention(m)"
-          >
+          <div v-for="m in filteredMembers" :key="m.id" class="mention-item" @click="selectMention(m)">
             <el-avatar :size="28" :src="getMemberAvatar(m.id)">{{ m.name?.charAt(0) }}</el-avatar>
             <span>{{ m.name }}</span>
           </div>
           <div v-if="filteredMembers.length === 0" class="mention-empty">无匹配成员</div>
         </div>
-        <el-input
-          ref="inputRef"
-          v-model="text"
-          placeholder="输入消息，@成员名可提及角色..."
-          @keyup.enter="send"
-          @input="onInput"
-          :disabled="waiting"
-          size="large"
-        />
+        <el-input ref="inputRef" v-model="text" placeholder="输入消息，@成员名可提及角色..." @keyup.enter="send" @input="onInput" :disabled="waiting" size="large" />
       </div>
       <el-button type="primary" :icon="Promotion" size="large" @click="send" :disabled="waiting || !text.trim()" />
     </div>
@@ -86,10 +77,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, computed, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ArrowLeft, Promotion, ChatDotRound, Connection, InfoFilled } from '@element-plus/icons-vue'
-import { getGroup, getGroupHistory, sendGroupMessage, getAvatarUrl } from '@/api'
+import { getGroup, getGroupHistory, sendGroupMessage, getAvatarUrl, autoStep, setGroupMode } from '@/api'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -105,9 +96,12 @@ const loading = ref(true)
 const mc = ref(null)
 const inputRef = ref(null)
 
-const chatMode = ref('mention')  // 'mention' or 'auto'
+const chatMode = ref('mention')
 const showMentionList = ref(false)
 const mentionFilter = ref('')
+let autoTimer = null
+let autoPaused = false
+
 const filteredMembers = computed(() => {
   if (!mentionFilter.value) return members.value
   const kw = mentionFilter.value.toLowerCase()
@@ -126,22 +120,170 @@ function getMemberAvatar(senderId) {
 
 function switchMode(mode) {
   if (mode === chatMode.value) return
-  if (mode === 'auto') {
-    ElMessage.info('自动对话模式将在后续阶段实现')
-  }
   chatMode.value = mode
+  // Persist mode change to backend
+  setGroupMode(gid, mode).catch(() => {})
+  if (mode === 'auto') {
+    ElMessage.success('已切换到自动对话模式')
+    autoPaused = false
+    startAutoLoop()
+  } else {
+    stopAutoLoop()
+    ElMessage.success('已切换到 @提及模式')
+  }
+}
+
+// ---- Auto dialogue loop ----
+function startAutoLoop() {
+  stopAutoLoop()
+  if (chatMode.value !== 'auto') return
+  autoTimer = setTimeout(runAutoStep, 2500)
+}
+
+function stopAutoLoop() {
+  if (autoTimer) { clearTimeout(autoTimer); autoTimer = null }
+}
+
+async function runAutoStep() {
+  if (chatMode.value !== 'auto' || autoPaused) { stopAutoLoop(); return }
+  try {
+    const res = await autoStep(gid)
+    if (res.code === 0) {
+      const d = res.data
+      if (d.action === 'speak' && d.reply) {
+        const now = nowTime()
+        messages.value.push({
+          role: 'char',
+          sender: d.character || 'AI',
+          senderId: d.character_id || '',
+          content: d.reply,
+          time: now
+        })
+        await scrollBottom()
+        // Continue loop quickly
+        autoTimer = setTimeout(runAutoStep, 2000)
+      } else if (d.action === 'wait') {
+        // Wait longer before checking again
+        autoTimer = setTimeout(runAutoStep, 4000)
+      } else {
+        // pause or other — stop
+        if (d.reason) {
+          messages.value.push({ role: 'system', content: '[对话暂停] ' + d.reason, time: nowTime() })
+        }
+        stopAutoLoop()
+      }
+    } else {
+      stopAutoLoop()
+    }
+  } catch (e) {
+    // Retry after delay
+    autoTimer = setTimeout(runAutoStep, 5000)
+  }
+}
+
+// ---- @mention ----
+function onInput(val) {
+  const cursorPos = inputRef.value?.$el?.querySelector('input')?.selectionStart
+  if (cursorPos === undefined) { showMentionList.value = false; return }
+  const beforeCursor = val.slice(0, cursorPos)
+  const atMatch = beforeCursor.match(/@([\w\u4e00-\u9fff]*)$/)
+  if (atMatch) {
+    mentionFilter.value = atMatch[1]
+    showMentionList.value = true
+  } else {
+    showMentionList.value = false
+  }
+}
+
+function selectMention(member) {
+  const cursorPos = inputRef.value?.$el?.querySelector('input')?.selectionStart || 0
+  const beforeCursor = text.value.slice(0, cursorPos)
+  const afterCursor = text.value.slice(cursorPos)
+  const atIndex = beforeCursor.lastIndexOf('@')
+  const newText = beforeCursor.slice(0, atIndex) + '@' + member.name + ' ' + afterCursor
+  text.value = newText
+  showMentionList.value = false
+  nextTick(() => {
+    const inp = inputRef.value?.$el?.querySelector('input')
+    if (inp) {
+      const newPos = atIndex + member.name.length + 2
+      inp.setSelectionRange(newPos, newPos)
+      inp.focus()
+    }
+  })
+}
+
+function renderContent(content) {
+  if (!content) return ''
+  return content.replace(/@([\w\u4e00-\u9fff]+)/g, '<span class="mention">@$1</span>')
+}
+
+// ---- Send ----
+async function send() {
+  const msg = text.value.trim()
+  if (!msg || waiting.value) return
+  showMentionList.value = false
+  text.value = ''
+  const now = nowTime()
+  messages.value.push({ role: 'user', sender: 'Me', senderId: '', content: msg, time: now })
+
+  // In auto mode, pause auto-loop while waiting for manual response
+  if (chatMode.value === 'auto') {
+    autoPaused = true
+    stopAutoLoop()
+  }
+
+  waiting.value = true
+  await scrollBottom()
+  try {
+    const res = await sendGroupMessage(gid, msg, '')
+    if (res.code === 0 && res.data.reply) {
+      messages.value.push({
+        role: 'char',
+        sender: res.data.responder_name || 'AI',
+        senderId: res.data.responder_id || '',
+        content: res.data.reply,
+        time: nowTime()
+      })
+      await scrollBottom()
+    }
+  } catch (e) { ElMessage.error('Send failed') }
+  finally {
+    waiting.value = false
+    await scrollBottom()
+    // Resume auto loop if in auto mode
+    if (chatMode.value === 'auto') {
+      autoPaused = false
+      startAutoLoop()
+    }
+  }
+}
+
+function nowTime() {
+  const d = new Date()
+  return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0')
+}
+
+async function scrollBottom() {
+  await nextTick()
+  if (mc.value) mc.value.scrollTop = mc.value.scrollHeight
+}
+
+function goBack() {
+  stopAutoLoop()
+  router.push('/groupchats')
 }
 
 onMounted(async () => {
   try {
-    const [gr, hr] = await Promise.all([
-      getGroup(gid),
-      getGroupHistory(gid)
-    ])
+    const [gr, hr] = await Promise.all([getGroup(gid), getGroupHistory(gid)])
     if (gr.code === 0) {
       group.value = gr.data
       members.value = gr.data.member_details || []
-      if (gr.data.mode) chatMode.value = gr.data.mode
+      const savedMode = gr.data.mode
+      if (savedMode === 'auto' || savedMode === 'mention') {
+        chatMode.value = savedMode
+      }
     }
     if (hr.code === 0 && hr.data.history) {
       hr.data.history.split('\n').filter(Boolean).forEach(line => {
@@ -149,6 +291,11 @@ onMounted(async () => {
         if (m) {
           const senderName = m[1]
           const content = m[2]
+          const isAdmin = (senderName === 'Admin')
+          if (isAdmin) {
+            messages.value.push({ role: 'system', sender: 'Admin', content, time: '' })
+            return
+          }
           const isUser = (senderName === 'Me')
           const member = members.value.find(mb => mb.name === senderName)
           messages.value.push({
@@ -162,87 +309,18 @@ onMounted(async () => {
       })
     }
   } catch (e) { ElMessage.error('Failed to load') }
-  finally { loading.value = false }
+  finally {
+    loading.value = false
+    // Start auto loop if mode is auto
+    if (chatMode.value === 'auto') {
+      startAutoLoop()
+    }
+  }
 })
 
-// @自动补全逻辑
-function onInput(val) {
-  // Check if the user just typed @
-  const cursorPos = inputRef.value?.$el?.querySelector('input')?.selectionStart
-  if (cursorPos === undefined) {
-    showMentionList.value = false
-    return
-  }
-  const beforeCursor = val.slice(0, cursorPos)
-  const atMatch = beforeCursor.match(/@([\w\u4e00-\u9fff]*)$/)
-  if (atMatch) {
-    mentionFilter.value = atMatch[1]
-    showMentionList.value = true
-  } else {
-    showMentionList.value = false
-  }
-}
-
-function selectMention(member) {
-  // Replace the partial @mention with the full name
-  const cursorPos = inputRef.value?.$el?.querySelector('input')?.selectionStart || 0
-  const beforeCursor = text.value.slice(0, cursorPos)
-  const afterCursor = text.value.slice(cursorPos)
-  const atIndex = beforeCursor.lastIndexOf('@')
-  const newText = beforeCursor.slice(0, atIndex) + '@' + member.name + ' ' + afterCursor
-  text.value = newText
-  showMentionList.value = false
-  // Focus back on input
-  nextTick(() => {
-    const inp = inputRef.value?.$el?.querySelector('input')
-    if (inp) {
-      const newPos = atIndex + member.name.length + 2
-      inp.setSelectionRange(newPos, newPos)
-      inp.focus()
-    }
-  })
-}
-
-// 高亮 @mention
-function renderContent(content) {
-  if (!content) return ''
-  return content.replace(/@([\w\u4e00-\u9fff]+)/g, '<span class="mention">@$1</span>')
-}
-
-async function send() {
-  const msg = text.value.trim()
-  if (!msg || waiting.value) return
-  showMentionList.value = false
-  text.value = ''
-  const now = nowTime()
-  messages.value.push({ role: 'user', sender: 'Me', senderId: '', content: msg, time: now })
-  waiting.value = true
-  await scrollBottom()
-  try {
-    const res = await sendGroupMessage(gid, msg, '')
-    if (res.code === 0 && res.data.reply) {
-      messages.value.push({
-        role: 'char',
-        sender: res.data.responder_name || 'AI',
-        senderId: res.data.responder_id || '',
-        content: res.data.reply,
-        time: nowTime()
-      })
-    }
-  } catch (e) { ElMessage.error('Send failed') }
-  finally { waiting.value = false; await scrollBottom() }
-}
-
-function nowTime() {
-  const d = new Date()
-  return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0')
-}
-
-async function scrollBottom() {
-  await nextTick()
-  if (mc.value) mc.value.scrollTop = mc.value.scrollHeight
-}
-function goBack() { router.push('/groupchats') }
+onBeforeUnmount(() => {
+  stopAutoLoop()
+})
 </script>
 
 <style scoped>
@@ -270,6 +348,10 @@ function goBack() { router.push('/groupchats') }
 /* Messages container */
 .messages { flex: 1; overflow-y: auto; padding: 16px; }
 .loading-msg, .empty-msg { text-align: center; color: #909399; padding: 60px 0; font-size: 15px; }
+
+/* System messages */
+.system-msg { text-align: center; padding: 8px 0; }
+.system-text { font-size: 12px; color: #909399; background: #f5f5f5; padding: 2px 12px; border-radius: 10px; }
 
 /* Chat bubbles */
 .msg-row { display: flex; margin-bottom: 18px; align-items: flex-start; }

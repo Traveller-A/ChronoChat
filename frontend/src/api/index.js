@@ -178,4 +178,14 @@ export function getGroupHistory(id) {
   return apiClient.get(`/groups/${encodeURIComponent(id)}/history`)
 }
 
+/** 执行一步自动对话 */
+export function autoStep(id) {
+  return apiClient.post(`/groups/${encodeURIComponent(id)}/auto-step`)
+}
+
+/** 切换群聊模式 */
+export function setGroupMode(id, mode) {
+  return apiClient.post(`/groups/${encodeURIComponent(id)}/mode`, { mode })
+}
+
 export default apiClient

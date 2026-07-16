@@ -3,6 +3,7 @@
 #include "../services/character_service.h"
 #include "../config/config_manager.h"
 #include "../ai/ai_service.h"
+#include "../ai/admin_agent.h"
 #include <drogon/HttpResponse.h>
 #include <json/json.h>
 #include <sstream>
@@ -187,6 +188,35 @@ void GroupController::chat(const drogon::HttpRequestPtr& req, std::function<void
 
     // Check for @mentions (only process if message is from user, i.e. sender_id empty)
     if (senderId.empty()) {
+        // Check for @admin / @管理员 — store as admin instructions
+        bool isAdminCmd = false;
+        {
+            auto mentions = parseMentions(message);
+            for (const auto& name : mentions) {
+                if (name == "admin" || name == "\xE7\xAE\xA1\xE7\x90\x86\xE5\x91\x98") {
+                    isAdminCmd = true;
+                    break;
+                }
+            }
+        }
+        if (isAdminCmd) {
+            // Store the message as admin instructions
+            std::string existing = GroupService::instance().getAdminInstructions(id);
+            std::string newInstructions = existing.empty()
+                ? message
+                : existing + "\n" + message;
+            GroupService::instance().setAdminInstructions(id, newInstructions);
+
+            auto r = ok("Admin instruction saved");
+            r["data"]["reply"] = "Got it! I'll follow your scheduling instructions.";
+            r["data"]["responder_name"] = "Admin";
+            r["data"]["responder_id"] = "";
+            // Also log the admin response
+            GroupService::instance().appendChatLog(id, "[Admin]: Got it! I'll follow your scheduling instructions.");
+            auto hr = drogon::HttpResponse::newHttpJsonResponse(r); cors(hr); cb(hr);
+            return;
+        }
+
         auto mentions = parseMentions(message);
 
         // Filter out mention targets that are not group members
@@ -316,6 +346,180 @@ void GroupController::history(const drogon::HttpRequestPtr& req, std::function<v
     std::string log = GroupService::instance().getChatLog(id);
     auto r = ok();
     r["data"]["history"] = log;
+    auto hr = drogon::HttpResponse::newHttpJsonResponse(r); cors(hr); cb(hr);
+}
+
+void GroupController::autoStep(const drogon::HttpRequestPtr& req, std::function<void(const drogon::HttpResponsePtr&)>&& cb, const std::string& id) {
+    auto g = GroupService::instance().getGroup(id);
+    if (g.id.empty()) { auto hr = drogon::HttpResponse::newHttpJsonResponse(err("Group not found")); cors(hr); cb(hr); return; }
+
+    auto memberIds = GroupService::instance().getMemberIds(id);
+    if (memberIds.empty()) {
+        auto r = ok("No members"); r["data"]["action"] = "pause";
+        auto hr = drogon::HttpResponse::newHttpJsonResponse(r); cors(hr); cb(hr); return;
+    }
+
+    // Build member name list
+    auto& charSvc = CharacterService::instance();
+    std::ostringstream memberList;
+    for (size_t i = 0; i < memberIds.size(); ++i) {
+        auto mc = charSvc.getCharacter(memberIds[i]);
+        if (!mc.id.empty()) {
+            if (i > 0) memberList << ", ";
+            memberList << mc.name;
+        }
+    }
+
+    // Get recent chat history and admin instructions
+    std::string recentChat = GroupService::instance().getRecentChatLog(id, 30);
+    std::string adminInstructions = GroupService::instance().getAdminInstructions(id);
+
+    // Call AdminAgent to decide next speaker
+    AdminAgent::instance().decideNextSpeaker(
+        g.name, memberList.str(), recentChat, adminInstructions,
+        [cb, id, memberIds](bool success, const std::string& action,
+                            const std::string& character, const std::string& reason) {
+            if (!success || action != "speak") {
+                auto r = ok("Admin decision");
+                r["data"]["action"] = action;
+                r["data"]["reason"] = reason;
+                auto hr = drogon::HttpResponse::newHttpJsonResponse(r); cors(hr); cb(hr);
+                return;
+            }
+
+            // Find the character by name
+            auto& charSvc = CharacterService::instance();
+            std::string targetId;
+            for (const auto& cid : memberIds) {
+                auto c = charSvc.getCharacter(cid);
+                if (!c.id.empty() && c.name == character) {
+                    targetId = cid;
+                    break;
+                }
+            }
+
+            if (targetId.empty()) {
+                auto r = ok("Character not found");
+                r["data"]["action"] = "wait";
+                r["data"]["reason"] = "Character '" + character + "' not found in group";
+                auto hr = drogon::HttpResponse::newHttpJsonResponse(r); cors(hr); cb(hr);
+                return;
+            }
+
+            auto c = charSvc.getCharacter(targetId);
+
+            // API config: character-specific > global
+            std::string apiUrl = c.textApiBaseUrl;
+            std::string apiKey = c.textApiKey;
+            std::string apiModel = c.textModel;
+            if (apiUrl.empty() || apiKey.empty()) {
+                apiUrl = ConfigManager::instance().getTextApiBaseUrl();
+                apiKey = ConfigManager::instance().getTextApiKey();
+            }
+            if (apiModel.empty()) apiModel = ConfigManager::instance().getTextModel();
+
+            if (apiUrl.empty() || apiKey.empty()) {
+                auto r = ok("No API configured");
+                r["data"]["action"] = "wait";
+                auto hr = drogon::HttpResponse::newHttpJsonResponse(r); cors(hr); cb(hr);
+                return;
+            }
+
+            // Normalize URL
+            while (!apiUrl.empty() && apiUrl.back() == '/') apiUrl.pop_back();
+            if (apiUrl.length() < 3 || apiUrl.substr(apiUrl.length() - 3) != "/v1")
+                apiUrl += "/v1";
+
+            // Build system prompt for group chat context
+            std::string identity = charSvc.readCharacterFile(targetId, "IDENTITY.md");
+            std::string soul = charSvc.readCharacterFile(targetId, "SOUL.md");
+            std::string memory = charSvc.readCharacterFile(targetId, "MEMORY.md");
+
+            // Get member names
+            std::ostringstream mList;
+            for (size_t i = 0; i < memberIds.size(); ++i) {
+                auto mc = charSvc.getCharacter(memberIds[i]);
+                if (!mc.id.empty()) {
+                    if (i > 0) mList << ", ";
+                    mList << mc.name;
+                }
+            }
+
+            // Get recent chat for character context
+            std::string groupChat = GroupService::instance().getRecentChatLog(id, 30);
+
+            std::ostringstream sysPrompt;
+            sysPrompt << "=== Group Chat Context ===\n"
+                      << "You are " << character << ", and you are currently in a group chat.\n"
+                      << "Group members: " << mList.str() << "\n"
+                      << "The user 'Me' is also in this group.\n"
+                      << "You have been chosen to speak next by the conversation moderator.\n\n";
+
+            if (!identity.empty())
+                sysPrompt << "## Your Identity\n" << identity << "\n\n";
+            if (!soul.empty())
+                sysPrompt << "## Your Personality & Soul\n" << soul << "\n\n";
+            if (!memory.empty())
+                sysPrompt << "## Your Core Memories\n" << memory << "\n\n";
+
+            sysPrompt << "## Recent Group Chat History\n"
+                      << (groupChat.empty() ? "(No history yet)" : groupChat)
+                      << "\n\n";
+
+            sysPrompt << "Instructions:\n"
+                      << "- You are a member of this group chat, alongside: " << mList.str() << ".\n"
+                      << "- You've been selected to speak. Respond naturally in character.\n"
+                      << "- Keep your response concise (1-3 paragraphs).\n"
+                      << "- You can address other members by name if relevant.\n"
+                      << "- Reference past events from memories and chat history when relevant.\n"
+                      << "- Stay in character at all times.\n"
+                      << "- Do NOT include roleplay markers like *action* or [narrative].";
+
+            // Build a user message that explains the context
+            std::string contextMsg = "The group has been chatting. Now it's your turn to speak. "
+                                     "Respond naturally as " + character + " in the group chat.";
+
+            std::string capturedName = character;
+            std::string capturedId = targetId;
+            std::string capturedReason = reason;
+
+            AIService::instance().chat(apiUrl, apiKey, apiModel,
+                sysPrompt.str(), contextMsg,
+                [cb, id, capturedName, capturedId, capturedReason](bool aiOk, const std::string& aiResponse) {
+                    if (!aiOk) {
+                        auto r = ok("AI failed");
+                        r["data"]["action"] = "wait";
+                        auto hr = drogon::HttpResponse::newHttpJsonResponse(r); cors(hr); cb(hr);
+                        return;
+                    }
+
+                    // Append AI response to chat log
+                    std::string logEntry = "[" + capturedName + "]: " + aiResponse;
+                    GroupService::instance().appendChatLog(id, logEntry);
+
+                    auto r = ok("Auto step");
+                    r["data"]["action"] = "speak";
+                    r["data"]["character"] = capturedName;
+                    r["data"]["character_id"] = capturedId;
+                    r["data"]["reply"] = aiResponse;
+                    r["data"]["reason"] = capturedReason;
+                    auto hr = drogon::HttpResponse::newHttpJsonResponse(r); cors(hr); cb(hr);
+                });
+        });
+}
+
+void GroupController::setMode(const drogon::HttpRequestPtr& req, std::function<void(const drogon::HttpResponsePtr&)>&& cb, const std::string& id) {
+    auto json = req->getJsonObject();
+    if (!json) { auto hr = drogon::HttpResponse::newHttpJsonResponse(err("Invalid JSON")); cors(hr); cb(hr); return; }
+
+    std::string mode = (*json).get("mode", "").asString();
+    if (mode != "mention" && mode != "auto") {
+        auto hr = drogon::HttpResponse::newHttpJsonResponse(err("Invalid mode. Use 'mention' or 'auto'")); cors(hr); cb(hr);
+        return;
+    }
+
+    bool okb = GroupService::instance().updateMode(id, mode);
+    auto r = okb ? ok("Mode updated") : err("Update failed");
     auto hr = drogon::HttpResponse::newHttpJsonResponse(r); cors(hr); cb(hr);
 }
 

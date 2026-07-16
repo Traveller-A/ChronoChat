@@ -42,6 +42,13 @@ public:
     std::string getRecentChatLog(const std::string& groupId, int maxLines) const;
     void appendChatLog(const std::string& groupId, const std::string& entry);
 
+    // Admin instructions (for auto-dialogue mode)
+    std::string getAdminInstructions(const std::string& groupId) const;
+    void setAdminInstructions(const std::string& groupId, const std::string& instructions);
+
+    // Update group mode only
+    bool updateMode(const std::string& groupId, const std::string& mode);
+
     std::string dataDir() const { return dataDir_; }
     std::string getGroupDir(const std::string& id) const;
 

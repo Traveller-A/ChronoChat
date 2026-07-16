@@ -242,6 +242,34 @@ void GroupService::appendChatLog(const std::string& groupId, const std::string& 
     out << entry << "\n";
 }
 
+std::string GroupService::getAdminInstructions(const std::string& groupId) const {
+    std::string path = dataDir_ + "/groups/" + groupId + "/admin_instructions.txt";
+    std::ifstream in(path);
+    if (!in) return "";
+    std::ostringstream oss; oss << in.rdbuf(); return oss.str();
+}
+
+void GroupService::setAdminInstructions(const std::string& groupId, const std::string& instructions) {
+    std::string path = dataDir_ + "/groups/" + groupId + "/admin_instructions.txt";
+    std::ofstream out(path, std::ios::trunc);
+    out << instructions;
+}
+
+bool GroupService::updateMode(const std::string& groupId, const std::string& mode) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!db_) return false;
+    int64_t now = nowMs();
+    const char* sql = "UPDATE groups SET mode=?, updated_at=? WHERE id=?;";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
+    sqlite3_bind_text(stmt, 1, mode.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int64(stmt, 2, now);
+    sqlite3_bind_text(stmt, 3, groupId.c_str(), -1, SQLITE_STATIC);
+    bool ok = sqlite3_step(stmt) == SQLITE_DONE;
+    sqlite3_finalize(stmt);
+    return ok;
+}
+
 std::string GroupService::getGroupDir(const std::string& id) const {
     return dataDir_ + "/groups/" + id;
 }

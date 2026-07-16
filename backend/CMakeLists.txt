@@ -43,6 +43,7 @@ set(MODEL_SOURCES
 set(AI_SOURCES
     src/ai/api_client.cpp
     src/ai/ai_service.cpp
+    src/ai/admin_agent.cpp
 )
 
 set(UTIL_SOURCES
