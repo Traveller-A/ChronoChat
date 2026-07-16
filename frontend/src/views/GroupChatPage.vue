@@ -80,10 +80,10 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { ArrowLeft, Promotion, ChatDotRound, Connection, InfoFilled, Setting } from '@element-plus/icons-vue'
 import { getGroup, getGroupHistory, sendGroupMessage, getAvatarUrl, autoStep, setGroupMode, getConfig } from '@/api'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 
 const router = useRouter()
 const route = useRoute()
@@ -129,15 +129,89 @@ function switchMode(mode) {
   if (mode === 'auto') {
     ElMessage.success('已切换到自动对话模式')
     autoPaused = false
+    switchedToMention = false
+    resetInactivityTimer()
     startAutoLoop()
   } else {
     stopAutoLoop()
+    clearInactivityTimer()
     ElMessage.success('已切换到 @提及模式')
   }
 }
 
 // ---- Auto dialogue loop ----
 let autoIdleTimer = null
+
+// ---- Inactivity / Leave detection ----
+const INACTIVITY_TIMEOUT = 5 * 60 * 1000 // 5 minutes
+let inactivityTimer = null
+let switchedToMention = false  // prevent duplicate switch calls
+
+function resetInactivityTimer() {
+  if (inactivityTimer) clearTimeout(inactivityTimer)
+  if (chatMode.value !== 'auto' || switchedToMention) return
+  inactivityTimer = setTimeout(autoSwitchToMention, INACTIVITY_TIMEOUT)
+}
+
+function clearInactivityTimer() {
+  if (inactivityTimer) { clearTimeout(inactivityTimer); inactivityTimer = null }
+}
+
+async function autoSwitchToMention() {
+  if (switchedToMention || chatMode.value !== 'auto') return
+  switchedToMention = true
+  chatMode.value = 'mention'
+  stopAutoLoop()
+  clearInactivityTimer()
+  try {
+    await setGroupMode(gid, 'mention')
+    ElNotification({
+      title: '群聊模式已切换',
+      message: '长时间未活动，已自动切换为 @提及模式',
+      type: 'info',
+      duration: 5000
+    })
+  } catch (e) { /* ignore */ }
+}
+
+// Route leave guard
+onBeforeRouteLeave(async (_to, _from, next) => {
+  if (chatMode.value === 'auto' && !switchedToMention) {
+    try {
+      await ElMessageBox.confirm(
+        '当前为自动对话模式，离开后角色可能继续发言。是否切换为 @提及模式？',
+        '离开群聊',
+        { confirmButtonText: '切换并离开', cancelButtonText: '保持自动模式', type: 'warning' }
+      )
+      await autoSwitchToMention()
+    } catch (e) { /* user cancelled, leave as-is */ }
+  }
+  stopAutoLoop()
+  clearInactivityTimer()
+  next()
+})
+
+// Tab close detection
+function handleBeforeUnload(e) {
+  if (chatMode.value === 'auto' && !switchedToMention) {
+    // Try to switch mode via sendBeacon (fire-and-forget)
+    const url = `/api/groups/${encodeURIComponent(gid)}/mode`
+    const body = JSON.stringify({ mode: 'mention' })
+    navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }))
+    // Show browser confirmation
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
+
+// Visibility change: when hidden + auto mode, start inactivity countdown
+function handleVisibilityChange() {
+  if (document.hidden && chatMode.value === 'auto') {
+    resetInactivityTimer()
+  } else if (!document.hidden) {
+    clearInactivityTimer()
+  }
+}
 
 function startAutoLoop() {
   stopAutoLoop()
@@ -248,6 +322,9 @@ async function send() {
   const now = nowTime()
   messages.value.push({ role: 'user', sender: '{{user}}', senderId: '', content: msg, time: now })
 
+  // Reset inactivity timer on every user message
+  resetInactivityTimer()
+
   // In auto mode, pause auto-loop while waiting for manual response
   if (chatMode.value === 'auto') {
     autoPaused = true
@@ -302,6 +379,10 @@ function goBack() {
 function goManage() { router.push(`/groupchats/${gid}/manage`) }
 
 onMounted(async () => {
+  // Register leave detection events
+  window.addEventListener('beforeunload', handleBeforeUnload)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+
   try {
     const [gr, hr, cfg] = await Promise.all([getGroup(gid), getGroupHistory(gid), getConfig()])
     if (cfg.code === 0 && cfg.data && cfg.data.user_name) {
@@ -352,6 +433,9 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   stopAutoLoop()
   if (autoIdleTimer) clearTimeout(autoIdleTimer)
+  clearInactivityTimer()
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
 
