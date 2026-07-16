@@ -256,9 +256,11 @@ async function send() {
 
   waiting.value = true
   await scrollBottom()
+  let hadReply = false
   try {
     const res = await sendGroupMessage(gid, msg, '')
     if (res.code === 0 && res.data.reply) {
+      hadReply = true
       messages.value.push({
         role: 'char',
         sender: res.data.responder_name || 'AI',
@@ -272,13 +274,10 @@ async function send() {
   finally {
     waiting.value = false
     await scrollBottom()
-    // In auto mode, only start idle timer if no direct @mention reply was generated
+    // In auto mode, restart idle timer unless a character already replied via @mention
     if (chatMode.value === 'auto') {
       autoPaused = false
-      stopAutoLoop()
-      // Check if the last message in the array is still the user's (meaning no AI reply was added)
-      const lastMsg = messages.value[messages.value.length - 1]
-      if (lastMsg && lastMsg.role === 'user') {
+      if (!hadReply) {
         resetIdleTimer()
       }
     }
