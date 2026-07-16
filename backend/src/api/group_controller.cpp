@@ -189,8 +189,8 @@ void GroupController::chat(const drogon::HttpRequestPtr& req, std::function<void
 
     auto memberIds = GroupService::instance().getMemberIds(id);
 
-    // Determine sender display name
-    std::string senderName = ConfigManager::instance().getUserName();
+    // Determine sender display name (use "Me" as placeholder; replaced with userName in prompts)
+    std::string senderName = "Me";
     if (!senderId.empty()) {
         auto c = CharacterService::instance().getCharacter(senderId);
         if (!c.id.empty()) senderName = c.name;
