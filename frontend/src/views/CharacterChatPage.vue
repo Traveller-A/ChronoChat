@@ -124,7 +124,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ArrowLeft, Promotion, Notebook, ChatDotRound, EditPen } from '@element-plus/icons-vue'
 import { getCharacter, sendMessage, getChatHistory, getAvatarUrl } from '@/api'
@@ -138,10 +138,11 @@ const mode = ref('chat')  // 'chat' | 'letter'
 const charName = ref('')
 const userName = ref('')
 const apiSource = ref('global')
-const messages = ref([])
-// Cache messages per mode to avoid reloading
-const chatCache = ref([])
-const letterCache = ref([])
+// Separate caches for each mode — never shared
+const chatMessages = ref([])
+const letterMessages = ref([])
+// Computed: auto-switches based on mode
+const messages = computed(() => mode.value === 'chat' ? chatMessages.value : letterMessages.value)
 const inputText = ref('')
 const waiting = ref(false)
 const loading = ref(true)
@@ -165,8 +166,6 @@ onMounted(async () => {
       charName.value = charRes.data.name
       userName.value = charRes.data.user_description || ''
     }
-    // Link messages to default mode cache
-    messages.value = chatCache.value
   } catch (err) { ElMessage.error('加载失败') }
   finally { loading.value = false }
 })
@@ -178,8 +177,8 @@ async function loadHistory(m) {
       apiSource.value = res.data.api_source || 'global'
       if (res.data.history) {
         const parsed = parseMemory(res.data.history)
-        if (m === 'chat') chatCache.value = parsed
-        else letterCache.value = parsed
+        if (m === 'chat') chatMessages.value = parsed
+        else letterMessages.value = parsed
       }
     }
   } catch (err) { /* ignore */ }
@@ -187,13 +186,11 @@ async function loadHistory(m) {
 
 async function switchMode(m) {
   mode.value = m
-  // Load history for this mode if not loaded yet
-  if (m === 'chat' && chatCache.value.length === 0) {
-    await loadHistory('chat')
-  } else if (m === 'letter' && letterCache.value.length === 0) {
-    await loadHistory('letter')
+  // Load history for this mode if not yet loaded
+  const cache = m === 'chat' ? chatMessages.value : letterMessages.value
+  if (cache.length === 0) {
+    await loadHistory(m)
   }
-  messages.value = m === 'chat' ? chatCache.value : letterCache.value
   await scrollBottom()
 }
 
@@ -201,14 +198,15 @@ function parseMemory(memory) {
   const blocks = memory.split('---')
   const parsed = []
   for (const block of blocks) {
-    const userMatch = block.match(/\*\*User\*\*:\s*(.+)/)
-    const charMatch = block.match(/\*\*Character\*\*:\s*(.+)/)
+    // [\s\S] matches across newlines; non-greedy to stop at next marker
+    const userMatch = block.match(/\*\*User\*\*:\s*([\s\S]+?)(?=\n\*\*Character\*\*|$)/)
+    const charMatch = block.match(/\*\*Character\*\*:\s*([\s\S]+)/)
     if (userMatch && charMatch) {
       parsed.push({ role: 'user', content: userMatch[1].trim(), time: '', date: '' })
       parsed.push({ role: 'char', content: charMatch[1].trim(), time: '', date: '' })
     }
   }
-  if (parsed.length > 0) messages.value = parsed
+  return parsed
 }
 
 // ---- Instant chat ----
@@ -216,7 +214,7 @@ async function doSendChat() {
   const text = inputText.value.trim()
   if (!text || waiting.value) return
   const userMsg = { role: 'user', content: text, time: nowTime(), date: todayStr }
-  chatCache.value.push(userMsg)
+  chatMessages.value.push(userMsg)
   inputText.value = ''
   await sendToAI(text)
 }
@@ -242,7 +240,7 @@ async function sendLetter() {
   const userMsg = {
     role: 'user', content: body, salutation, signature, date, time: nowTime()
   }
-  letterCache.value.push(userMsg)
+  letterMessages.value.push(userMsg)
   letterEditorVisible.value = false
   await sendToAI(fullLetter)
 }
@@ -256,9 +254,8 @@ async function sendToAI(text) {
     const res = await sendMessage(characterId, text, currentMode)
     if (res.code === 0 && res.data) {
       const charMsg = { role: 'char', content: res.data.message, time: nowTime(), date: todayStr }
-      // Push to cache (messages.value shares same array ref after switchMode)
-      if (currentMode === 'chat') chatCache.value.push(charMsg)
-      else letterCache.value.push(charMsg)
+      if (currentMode === 'chat') chatMessages.value.push(charMsg)
+      else letterMessages.value.push(charMsg)
       if (res.data.api_source) apiSource.value = res.data.api_source
     } else {
       ElMessage.error(res.message || '发送失败')
