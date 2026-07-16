@@ -93,6 +93,20 @@ static std::string replaceOwnName(const std::string& history, const std::string&
     return result;
 }
 
+// Replace configured userName with {{user}} placeholder, so the log file
+// never contains the actual user name.
+static std::string maskUserName(const std::string& text) {
+    std::string name = ConfigManager::instance().getUserName();
+    if (name.empty() || name == "{{user}}") return text;
+    std::string result = text;
+    size_t pos = 0;
+    while ((pos = result.find(name, pos)) != std::string::npos) {
+        result.replace(pos, name.length(), "{{user}}");
+        pos += 8; // length of "{{user}}"
+    }
+    return result;
+}
+
 void GroupController::list(const drogon::HttpRequestPtr& req, std::function<void(const drogon::HttpResponsePtr&)>&& cb) {
     auto groups = GroupService::instance().listGroups();
     Json::Value arr(Json::arrayValue);
@@ -349,8 +363,8 @@ void GroupController::chat(const drogon::HttpRequestPtr& req, std::function<void
                             return;
                         }
 
-                        // Append AI response to chat log
-                        std::string aiLog = "[" + capturedName + "]: " + aiResponse;
+                        // Append AI response to chat log (mask username to placeholder)
+                        std::string aiLog = "[" + capturedName + "]: " + maskUserName(aiResponse);
                         GroupService::instance().appendChatLog(id, aiLog);
 
                         auto r = ok("Message sent");
@@ -535,8 +549,8 @@ void GroupController::autoStep(const drogon::HttpRequestPtr& req, std::function<
                         return;
                     }
 
-                    // Append AI response to chat log
-                    std::string logEntry = "[" + capturedName + "]: " + aiResponse;
+                    // Append AI response to chat log (mask username to placeholder)
+                    std::string logEntry = "[" + capturedName + "]: " + maskUserName(aiResponse);
                     GroupService::instance().appendChatLog(id, logEntry);
 
                     auto r = ok("Auto step");
