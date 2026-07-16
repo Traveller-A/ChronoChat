@@ -5,9 +5,9 @@
 #include "../ai/ai_service.h"
 #include <drogon/HttpResponse.h>
 #include <json/json.h>
-#include <regex>
 #include <sstream>
 #include <algorithm>
+#include <cctype>
 
 namespace chronochat {
 
@@ -36,18 +36,33 @@ static std::string normalizeUrl(const std::string& url) {
     return result;
 }
 
-// Parse @mentions from a message. Returns vector of mentioned character names.
+// Parse @mentions from a message using manual string scanning (avoids MSVC regex Unicode issues).
+// Returns vector of mentioned names (deduplicated).
 static std::vector<std::string> parseMentions(const std::string& message) {
     std::vector<std::string> mentions;
-    std::regex mentionRegex("@([\\w\\u4e00-\\u9fff\\u3400-\\u4dbf]+)");
-    std::sregex_iterator it(message.begin(), message.end(), mentionRegex);
-    std::sregex_iterator end;
-    for (; it != end; ++it) {
-        std::string name = (*it)[1].str();
-        // Deduplicate
-        if (std::find(mentions.begin(), mentions.end(), name) == mentions.end()) {
-            mentions.push_back(name);
+    size_t i = 0;
+    while (i < message.length()) {
+        // Find '@'
+        size_t atPos = message.find('@', i);
+        if (atPos == std::string::npos) break;
+
+        // Extract name: start from char after @, go until whitespace or end
+        size_t nameStart = atPos + 1;
+        if (nameStart >= message.length()) break;
+
+        size_t nameEnd = nameStart;
+        while (nameEnd < message.length() && !std::isspace(static_cast<unsigned char>(message[nameEnd]))) {
+            ++nameEnd;
         }
+
+        std::string name = message.substr(nameStart, nameEnd - nameStart);
+        if (!name.empty()) {
+            // Deduplicate
+            if (std::find(mentions.begin(), mentions.end(), name) == mentions.end()) {
+                mentions.push_back(name);
+            }
+        }
+        i = nameEnd;
     }
     return mentions;
 }
