@@ -170,7 +170,7 @@ onMounted(async () => {
       userName.value = charRes.data.user_description || ''
     }
   } catch (err) { ElMessage.error('加载失败') }
-  finally { loading.value = false }
+  finally { loading.value = false; await scrollBottom() }
 })
 
 async function loadHistory(m) {

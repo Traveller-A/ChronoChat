@@ -332,6 +332,7 @@ onMounted(async () => {
   } catch (e) { ElMessage.error('Failed to load') }
   finally {
     loading.value = false
+    await scrollBottom()
     // Start auto loop if mode is auto
     if (chatMode.value === 'auto') {
       startAutoLoop()
