@@ -1,0 +1,43 @@
+# Build output
+backend/build/
+*.exe
+*.obj
+*.o
+*.dll
+
+# Dependencies
+frontend/node_modules/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Runtime data (user data, not source code)
+data/characters/*
+data/uploads/*
+backend/data/chronochat.db
+backend/data/chronochat.db-shm
+backend/data/chronochat.db-wal
+backend/data/config_api.json
+
+# Keep directory structures
+!data/characters/.gitkeep
+!data/uploads/.gitkeep
+!backend/data/.gitkeep
+
+# Config secrets
+backend/config.local.yml
+backend/config.local.json
+
+# Build artifacts
+frontend/dist/
+
+# Logs
+*.log

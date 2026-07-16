@@ -1,0 +1,21 @@
+# Build
+build/
+cmake-build-*/
+out/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Runtime data (contains user data)
+data/characters/
+data/uploads/
+data/chronochat.db
+
+# Config with secrets
+config.local.yml
