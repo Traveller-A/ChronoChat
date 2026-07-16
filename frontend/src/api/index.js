@@ -120,13 +120,13 @@ export function testCharacterMultimodalApi(id) {
 }
 
 /** 发送对话消息 */
-export function sendMessage(id, message) {
-  return apiClient.post(`/characters/${encodeURIComponent(id)}/chat`, { message })
+export function sendMessage(id, message, mode = 'chat') {
+  return apiClient.post(`/characters/${encodeURIComponent(id)}/chat`, { message, mode })
 }
 
-/** 获取对话历史 */
-export function getChatHistory(id) {
-  return apiClient.get(`/characters/${encodeURIComponent(id)}/history`)
+/** 获取对话历史 (mode: 'chat' | 'letter') */
+export function getChatHistory(id, mode = 'chat') {
+  return apiClient.get(`/characters/${encodeURIComponent(id)}/history`, { params: { mode } })
 }
 
 export default apiClient

@@ -531,6 +531,7 @@ void CharacterController::chat(
         httpResp->addHeader("Access-Control-Allow-Origin", "*"); callback(httpResp); return;
     }
     std::string userMessage = (*json)["message"].asString();
+    std::string mode = (*json).get("mode", "chat").asString(); // "chat" or "letter"
     if (userMessage.empty()) {
         Json::Value resp; resp["code"] = 1; resp["message"] = "Message is empty";
         auto httpResp = drogon::HttpResponse::newHttpJsonResponse(resp);
@@ -565,29 +566,49 @@ void CharacterController::chat(
         httpResp->addHeader("Access-Control-Allow-Origin", "*"); callback(httpResp); return;
     }
 
+    // Determine log file based on mode
+    std::string logFile = (mode == "letter") ? "LETTER_LOG.md" : "CHAT_LOG.md";
+    std::string otherLogFile = (mode == "letter") ? "CHAT_LOG.md" : "LETTER_LOG.md";
+
     // Load character files for context
     std::string identity = svc.readCharacterFile(id, "IDENTITY.md");
     std::string soul = svc.readCharacterFile(id, "SOUL.md");
     std::string memory = svc.readCharacterFile(id, "MEMORY.md");
     std::string userRel = svc.readCharacterFile(id, "USER.md");
+    std::string chatLog = svc.readCharacterFile(id, logFile);
+    std::string otherLog = svc.readCharacterFile(id, otherLogFile);
 
-    // Build system prompt from character identity + soul
+    // Build system prompt
     std::string systemPrompt = "You are roleplaying as the following character. "
         "Respond naturally in character. Stay true to your personality and memories.\n\n";
     if (!identity.empty()) systemPrompt += "## Identity\n" + identity + "\n\n";
     if (!soul.empty()) systemPrompt += "## Personality & Soul\n" + soul + "\n\n";
     if (!userRel.empty()) systemPrompt += "## Your Relationship with the User\n" + userRel + "\n\n";
-    systemPrompt += "## Recent Memories\n" + memory + "\n\n";
-    systemPrompt += "Instructions:\n"
-        "- Respond as the character would, using their speaking style.\n"
-        "- Reference past events from memories when relevant.\n"
-        "- Keep responses concise (1-3 paragraphs) unless the user asks for more.\n"
+    if (!memory.empty()) systemPrompt += "## Core Memories\n" + memory + "\n\n";
+    if (!chatLog.empty()) systemPrompt += "## Instant Chat History\n" + chatLog + "\n\n";
+    if (!otherLog.empty()) systemPrompt += "## Letter Correspondence History\n" + otherLog + "\n\n";
+    systemPrompt += "Instructions:\n";
+    if (mode == "letter") {
+        systemPrompt +=
+            "- You are writing a LETTER. Respond in formal letter format.\n"
+            "- Start with an appropriate salutation (e.g., 'Dear friend,' or '吾友亲启：').\n"
+            "- Write the letter body in a natural, flowing style.\n"
+            "- End with a proper closing and your character's signature.\n"
+            "- Do NOT include any text outside the letter — no meta-commentary, no markdown headers.\n"
+            "- The entire response should be the letter itself, nothing else.\n";
+    } else {
+        systemPrompt +=
+            "- Respond as the character would, using their speaking style.\n"
+            "- Keep responses concise (1-3 paragraphs) unless the user asks for more.\n";
+    }
+    systemPrompt +=
+        "- Reference past events from memories and conversation history when relevant.\n"
         "- If you don't know something, make reasonable inferences based on your personality.\n"
         "- Stay in character at all times.";
 
     // Call AI
     AIService::instance().chat(apiUrl, apiKey, apiModel, systemPrompt, userMessage,
-        [callback, id, userMessage, apiSource](bool success, const std::string& aiResponse) {
+        [callback, id, userMessage, apiSource, logFile](bool success, const std::string& aiResponse) {
             if (!success) {
                 Json::Value resp; resp["code"] = 1;
                 resp["message"] = "AI response failed: " + aiResponse;
@@ -595,19 +616,18 @@ void CharacterController::chat(
                 httpResp->addHeader("Access-Control-Allow-Origin", "*"); callback(httpResp); return;
             }
 
-            // Append to MEMORY.md
+            // Append to mode-specific log file
             auto& svc = CharacterService::instance();
-            std::string memory = svc.readCharacterFile(id, "MEMORY.md");
-            memory += "\n\n---\n**User**: " + userMessage + "\n**Character**: " + aiResponse + "\n";
-            // Keep memory from growing too large (keep last ~20 exchanges)
-            auto lines = std::count(memory.begin(), memory.end(), '\n');
+            std::string log = svc.readCharacterFile(id, logFile);
+            log += "\n\n---\n**User**: " + userMessage + "\n**Character**: " + aiResponse + "\n";
+            // Trim old entries if too long
+            auto lines = std::count(log.begin(), log.end(), '\n');
             if (lines > 500) {
-                // Trim oldest entries
-                auto pos = memory.find("---\n", memory.find("---\n") + 10);
-                if (pos != std::string::npos && pos < memory.length() / 3)
-                    memory = memory.substr(pos);
+                auto pos = log.find("---\n", log.find("---\n") + 10);
+                if (pos != std::string::npos && pos < log.length() / 3)
+                    log = log.substr(pos);
             }
-            svc.writeCharacterFile(id, "MEMORY.md", memory);
+            svc.writeCharacterFile(id, logFile, log);
 
             Json::Value data;
             data["message"] = aiResponse;
@@ -633,10 +653,16 @@ void CharacterController::chatHistory(
         httpResp->addHeader("Access-Control-Allow-Origin", "*"); callback(httpResp); return;
     }
 
-    std::string memory = svc.readCharacterFile(id, "MEMORY.md");
+    // Get mode from query param, default to "chat"
+    std::string mode = req->getParameter("mode");
+    if (mode.empty()) mode = "chat";
+
+    std::string logFile = (mode == "letter") ? "LETTER_LOG.md" : "CHAT_LOG.md";
+    std::string log = svc.readCharacterFile(id, logFile);
 
     Json::Value data;
-    data["memory"] = memory;
+    data["history"] = log;
+    data["mode"] = mode;
 
     // Check API source
     bool hasCharApi = !c.textApiBaseUrl.empty() && !c.textApiKey.empty();
