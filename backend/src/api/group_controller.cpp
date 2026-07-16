@@ -304,6 +304,9 @@ void GroupController::chat(const drogon::HttpRequestPtr& req, std::function<void
 
                 std::ostringstream sysPrompt;
                 sysPrompt << "=== Group Chat Context ===\n"
+                          << "CRITICAL: The human user's name is '" << userName << "'. "
+                          << "ALWAYS address them as '" << userName << "'. "
+                          << "NEVER call them 'Me' — 'Me' is just an internal display label, not a name.\n\n"
                           << "You are " << targetName << ", and you are currently in a group chat.\n"
                           << "Group members: " << memberList.str() << "\n"
                           << "The user '" << userName << "' is also in this group.\n"
@@ -491,6 +494,9 @@ void GroupController::autoStep(const drogon::HttpRequestPtr& req, std::function<
 
             std::ostringstream sysPrompt;
             sysPrompt << "=== Group Chat Context ===\n"
+                      << "CRITICAL: The human user's name is '" << userName << "'. "
+                      << "ALWAYS address them as '" << userName << "'. "
+                      << "NEVER call them 'Me' — 'Me' is just an internal display label, not a name.\n\n"
                       << "You are " << character << ", and you are currently in a group chat.\n"
                       << "Group members: " << mList.str() << "\n"
                       << "The user '" << userName << "' is also in this group.\n"
