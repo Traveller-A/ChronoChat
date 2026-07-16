@@ -246,9 +246,12 @@ void GroupController::chat(const drogon::HttpRequestPtr& req, std::function<void
                 }
 
                 std::ostringstream sysPrompt;
-                sysPrompt << "You are roleplaying as " << targetName
-                          << " in a group chat. The group members are: "
-                          << memberList.str() << ".\n\n";
+                sysPrompt << "=== Group Chat Context ===\n"
+                          << "You are " << targetName << ", and you are currently in a group chat.\n"
+                          << "Group members: " << memberList.str() << "\n"
+                          << "The user 'Me' is also in this group.\n"
+                          << "When someone sends a message starting with @" << targetName
+                          << ", they are speaking directly to you.\n\n";
 
                 if (!identity.empty())
                     sysPrompt << "## Your Identity\n" << identity << "\n\n";
@@ -264,10 +267,12 @@ void GroupController::chat(const drogon::HttpRequestPtr& req, std::function<void
                           << "\n\n";
 
                 sysPrompt << "Instructions:\n"
-                          << "- You are in a group chat. The message above is directed at you (you were @mentioned).\n"
-                          << "- Respond naturally as your character would in a group setting.\n"
+                          << "- You are a member of this group chat, alongside: "
+                          << memberList.str() << ".\n"
+                          << "- The user @" << targetName << " to get your attention. The message above is directed at you.\n"
+                          << "- Respond naturally as your character would in a group setting — you're speaking to everyone in the chat.\n"
                           << "- Keep your response concise (1-3 paragraphs).\n"
-                          << "- You can refer to other group members by name if relevant.\n"
+                          << "- You can address other group members by name if relevant to the conversation.\n"
                           << "- Reference past events from your memories and chat history when relevant.\n"
                           << "- Stay in character at all times.\n"
                           << "- Do NOT include roleplay markers like *action* or [narrative].";
