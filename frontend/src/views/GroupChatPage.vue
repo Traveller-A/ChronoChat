@@ -272,11 +272,15 @@ async function send() {
   finally {
     waiting.value = false
     await scrollBottom()
-    // In auto mode, reset idle timer (characters may respond after 6s of user silence)
+    // In auto mode, only start idle timer if no direct @mention reply was generated
     if (chatMode.value === 'auto') {
       autoPaused = false
       stopAutoLoop()
-      resetIdleTimer()
+      // Check if the last message in the array is still the user's (meaning no AI reply was added)
+      const lastMsg = messages.value[messages.value.length - 1]
+      if (lastMsg && lastMsg.role === 'user') {
+        resetIdleTimer()
+      }
     }
   }
 }
