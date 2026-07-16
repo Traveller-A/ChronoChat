@@ -326,6 +326,7 @@ void GroupController::chat(const drogon::HttpRequestPtr& req, std::function<void
                 sysPrompt << "Instructions:\n"
                           << "- You are a member of this group chat, alongside: "
                           << memberList.str() << ".\n"
+                          << "- The human user is named '" << userName << "'. Address them as " << userName << ".\n"
                           << "- The user @" << targetName << " to get your attention. The message above is directed at you.\n"
                           << "- Respond naturally as your character would in a group setting — you're speaking to everyone in the chat.\n"
                           << "- Keep your response brief (1-3 sentences). This is a fast-paced group chat, not a letter.\n"
@@ -508,6 +509,7 @@ void GroupController::autoStep(const drogon::HttpRequestPtr& req, std::function<
 
             sysPrompt << "Instructions:\n"
                       << "- You are a member of this group chat, alongside: " << mList.str() << ".\n"
+                      << "- The human user is named '" << userName << "'. Address them as " << userName << ".\n"
                       << "- You've been selected to speak. Respond naturally in character.\n"
                       << "- Keep your response brief (1-3 sentences). This is a fast-paced group chat.\n"
                       << "- You can address other members by name if relevant.\n"
