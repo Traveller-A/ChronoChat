@@ -9,6 +9,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cctype>
+#include <fstream>
 
 namespace chronochat {
 
@@ -162,6 +163,47 @@ void GroupController::update(const drogon::HttpRequestPtr& req, std::function<vo
     if (json->isMember("status")) g.status = (*json)["status"].asString();
     if (json->isMember("avatar_path")) g.avatarPath = (*json)["avatar_path"].asString();
     if (json->isMember("members_json")) g.membersJson = (*json)["members_json"].asString();
+
+    // Handle base64 avatar upload
+    if (json->isMember("avatar_base64")) {
+        std::string b64 = (*json)["avatar_base64"].asString();
+        if (!b64.empty()) {
+            // Strip data:image prefix if present
+            auto comma = b64.find(',');
+            if (comma != std::string::npos) b64 = b64.substr(comma + 1);
+            // Determine extension
+            std::string ext = "png";
+            if (b64.find("image/jpeg") != std::string::npos || b64.find("image/jpg") != std::string::npos)
+                ext = "jpg";
+            // Simple base64 decode
+            std::string decoded;
+            static const std::string base64Chars =
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+            int i = 0;
+            unsigned char ca4[4], ca3[3];
+            for (char c : b64) {
+                if (c == '=') break;
+                size_t idx = base64Chars.find(c);
+                if (idx == std::string::npos) continue;
+                ca4[i++] = static_cast<unsigned char>(idx);
+                if (i == 4) {
+                    ca3[0] = (ca4[0] << 2) + ((ca4[1] & 0x30) >> 4);
+                    ca3[1] = ((ca4[1] & 0x0F) << 4) + ((ca4[2] & 0x3C) >> 2);
+                    ca3[2] = ((ca4[2] & 0x03) << 6) + ca4[3];
+                    for (i = 0; i < 3; i++) decoded += ca3[i];
+                    i = 0;
+                }
+            }
+            // Save to group dir
+            std::string dir = GroupService::instance().getGroupDir(id);
+            std::string filename = "avatar." + ext;
+            std::ofstream out(dir + "/" + filename, std::ios::binary);
+            if (out) {
+                out.write(decoded.data(), decoded.size());
+                g.avatarPath = filename;
+            }
+        }
+    }
     bool okb = GroupService::instance().updateGroup(id, g);
     auto r = okb ? ok("Updated") : err("Update failed");
     auto hr = drogon::HttpResponse::newHttpJsonResponse(r); cors(hr); cb(hr);
@@ -577,6 +619,22 @@ void GroupController::setMode(const drogon::HttpRequestPtr& req, std::function<v
     bool okb = GroupService::instance().updateMode(id, mode);
     auto r = okb ? ok("Mode updated") : err("Update failed");
     auto hr = drogon::HttpResponse::newHttpJsonResponse(r); cors(hr); cb(hr);
+}
+
+void GroupController::avatar(const drogon::HttpRequestPtr& req, std::function<void(const drogon::HttpResponsePtr&)>&& cb, const std::string& id) {
+    auto g = GroupService::instance().getGroup(id);
+    if (g.id.empty()) {
+        auto hr = drogon::HttpResponse::newHttpJsonResponse(err("Not found")); cors(hr); cb(hr);
+        return;
+    }
+    std::string avatarPath = g.avatarPath;
+    if (avatarPath.empty()) {
+        auto hr = drogon::HttpResponse::newHttpJsonResponse(err("No avatar")); cors(hr); cb(hr);
+        return;
+    }
+    std::string fullPath = GroupService::instance().getGroupDir(id) + "/" + avatarPath;
+    auto resp = drogon::HttpResponse::newFileResponse(fullPath);
+    cors(resp); cb(resp);
 }
 
 } // namespace chronochat

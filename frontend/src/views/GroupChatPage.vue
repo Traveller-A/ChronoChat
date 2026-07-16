@@ -5,6 +5,8 @@
       <el-button :icon="ArrowLeft" circle class="back-btn" @click="goBack" />
       <span class="gname">{{ group.name || '群聊' }}</span>
 
+      <el-button :icon="Setting" circle size="small" class="manage-btn" @click="goManage" title="群聊管理" />
+
       <!-- 模式切换开关 -->
       <div class="mode-toggle">
         <span :class="{ active: chatMode === 'mention' }" @click="switchMode('mention')">
@@ -79,7 +81,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ArrowLeft, Promotion, ChatDotRound, Connection, InfoFilled } from '@element-plus/icons-vue'
+import { ArrowLeft, Promotion, ChatDotRound, Connection, InfoFilled, Setting } from '@element-plus/icons-vue'
 import { getGroup, getGroupHistory, sendGroupMessage, getAvatarUrl, autoStep, setGroupMode, getConfig } from '@/api'
 import { ElMessage } from 'element-plus'
 
@@ -294,6 +296,7 @@ function goBack() {
   if (autoIdleTimer) clearTimeout(autoIdleTimer)
   router.push('/groupchats')
 }
+function goManage() { router.push(`/groupchats/${gid}/manage`) }
 
 onMounted(async () => {
   try {
@@ -356,6 +359,7 @@ onBeforeUnmount(() => {
 .top-bar { display: flex; align-items: center; padding: 10px 16px; background: white; box-shadow: 0 1px 4px rgba(0,0,0,0.06); flex-shrink: 0; gap: 10px; }
 .gname { flex: 1; font-size: 17px; font-weight: 600; }
 .back-btn { border: none; background: #f5f5f5; }
+.manage-btn { border: none; background: #f5f5f5; margin-right: 4px; }
 
 /* Mode toggle */
 .mode-toggle { display: flex; background: #f0f0f0; border-radius: 20px; padding: 2px; margin-right: 4px; }

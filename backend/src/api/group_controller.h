@@ -17,6 +17,7 @@ public:
     ADD_METHOD_TO(GroupController::history, "/api/groups/{1}/history", drogon::Get);
     ADD_METHOD_TO(GroupController::autoStep, "/api/groups/{1}/auto-step", drogon::Post);
     ADD_METHOD_TO(GroupController::setMode, "/api/groups/{1}/mode", drogon::Post);
+    ADD_METHOD_TO(GroupController::avatar, "/api/groups/{1}/avatar", drogon::Get);
     METHOD_LIST_END
 
     void list(const drogon::HttpRequestPtr& req, std::function<void(const drogon::HttpResponsePtr&)>&& cb);
@@ -30,6 +31,7 @@ public:
     void history(const drogon::HttpRequestPtr& req, std::function<void(const drogon::HttpResponsePtr&)>&& cb, const std::string& id);
     void autoStep(const drogon::HttpRequestPtr& req, std::function<void(const drogon::HttpResponsePtr&)>&& cb, const std::string& id);
     void setMode(const drogon::HttpRequestPtr& req, std::function<void(const drogon::HttpResponsePtr&)>&& cb, const std::string& id);
+    void avatar(const drogon::HttpRequestPtr& req, std::function<void(const drogon::HttpResponsePtr&)>&& cb, const std::string& id);
 };
 
 } // namespace chronochat
