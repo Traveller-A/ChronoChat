@@ -140,7 +140,7 @@ function startAutoLoop() {
   stopAutoLoop()
   if (chatMode.value !== 'auto') return
   // Start with a 3s delay to give user time to read
-  autoTimer = setTimeout(runAutoStep, 3000)
+  autoTimer = setTimeout(runAutoStep, 2000)
 }
 
 function stopAutoLoop() {
@@ -155,7 +155,7 @@ function resetIdleTimer() {
     if (chatMode.value === 'auto' && !autoPaused) {
       startAutoLoop()
     }
-  }, 6000) // 6s idle before characters continue among themselves
+  }, 3000) // 3s idle before characters continue among themselves
 }
 
 async function runAutoStep() {
