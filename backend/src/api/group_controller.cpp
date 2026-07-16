@@ -1,8 +1,13 @@
 #include "group_controller.h"
 #include "../services/group_service.h"
 #include "../services/character_service.h"
+#include "../config/config_manager.h"
+#include "../ai/ai_service.h"
 #include <drogon/HttpResponse.h>
 #include <json/json.h>
+#include <regex>
+#include <sstream>
+#include <algorithm>
 
 namespace chronochat {
 
@@ -18,6 +23,45 @@ static Json::Value groupToJson(const GroupInfo& g) {
 static void cors(const drogon::HttpResponsePtr& r) { r->addHeader("Access-Control-Allow-Origin", "*"); }
 static Json::Value ok(const std::string& m="ok") { Json::Value j; j["code"]=0; j["message"]=m; return j; }
 static Json::Value err(const std::string& m) { Json::Value j; j["code"]=1; j["message"]=m; return j; }
+
+// ---- Helpers ----
+
+// Normalize URL: ensure ends with /v1
+static std::string normalizeUrl(const std::string& url) {
+    if (url.empty()) return url;
+    std::string result = url;
+    while (!result.empty() && result.back() == '/') result.pop_back();
+    if (result.length() < 3 || result.substr(result.length() - 3) != "/v1")
+        result += "/v1";
+    return result;
+}
+
+// Parse @mentions from a message. Returns vector of mentioned character names.
+static std::vector<std::string> parseMentions(const std::string& message) {
+    std::vector<std::string> mentions;
+    std::regex mentionRegex("@([\\w\\u4e00-\\u9fff\\u3400-\\u4dbf]+)");
+    std::sregex_iterator it(message.begin(), message.end(), mentionRegex);
+    std::sregex_iterator end;
+    for (; it != end; ++it) {
+        std::string name = (*it)[1].str();
+        // Deduplicate
+        if (std::find(mentions.begin(), mentions.end(), name) == mentions.end()) {
+            mentions.push_back(name);
+        }
+    }
+    return mentions;
+}
+
+// Find a character by name among group members
+static std::string findCharIdByName(const std::vector<std::string>& memberIds, const std::string& name) {
+    for (const auto& cid : memberIds) {
+        auto c = CharacterService::instance().getCharacter(cid);
+        if (!c.id.empty() && c.name == name) {
+            return c.id;
+        }
+    }
+    return "";
+}
 
 void GroupController::list(const drogon::HttpRequestPtr& req, std::function<void(const drogon::HttpResponsePtr&)>&& cb) {
     auto groups = GroupService::instance().listGroups();
@@ -109,25 +153,142 @@ void GroupController::chat(const drogon::HttpRequestPtr& req, std::function<void
 
     if (message.empty()) { auto hr = drogon::HttpResponse::newHttpJsonResponse(err("Message required")); cors(hr); cb(hr); return; }
 
+    // Get group info
+    auto g = GroupService::instance().getGroup(id);
+    if (g.id.empty()) { auto hr = drogon::HttpResponse::newHttpJsonResponse(err("Group not found")); cors(hr); cb(hr); return; }
+
+    auto memberIds = GroupService::instance().getMemberIds(id);
+
     // Determine sender display name
     std::string senderName = "Me";
     if (!senderId.empty()) {
         auto c = CharacterService::instance().getCharacter(senderId);
-        if (!c.id.empty()) {
-            senderName = c.name;
-        } else {
-            senderName = "Unknown";
-        }
+        if (!c.id.empty()) senderName = c.name;
     }
 
-    // Append to chat log
+    // Append user message to chat log
     std::string logEntry = "[" + senderName + "]: " + message;
     GroupService::instance().appendChatLog(id, logEntry);
 
-    // Phase 1: just log the message, no AI reply yet
+    // Check for @mentions (only process if message is from user, i.e. sender_id empty)
+    if (senderId.empty()) {
+        auto mentions = parseMentions(message);
+
+        // Filter out mention targets that are not group members
+        std::vector<std::string> validTargets;
+        for (const auto& name : mentions) {
+            std::string cid = findCharIdByName(memberIds, name);
+            if (!cid.empty()) {
+                validTargets.push_back(name);
+            }
+        }
+
+        if (!validTargets.empty()) {
+            // Process first mentioned character only (Phase 2 limitation)
+            std::string targetName = validTargets[0];
+            std::string targetId = findCharIdByName(memberIds, targetName);
+
+            if (!targetId.empty()) {
+                auto& charSvc = CharacterService::instance();
+                auto c = charSvc.getCharacter(targetId);
+
+                // API config: character-specific > global
+                std::string apiUrl = c.textApiBaseUrl;
+                std::string apiKey = c.textApiKey;
+                std::string apiModel = c.textModel;
+                if (apiUrl.empty() || apiKey.empty()) {
+                    apiUrl = ConfigManager::instance().getTextApiBaseUrl();
+                    apiKey = ConfigManager::instance().getTextApiKey();
+                }
+                if (apiModel.empty()) apiModel = ConfigManager::instance().getTextModel();
+
+                if (apiUrl.empty() || apiKey.empty()) {
+                    auto r = ok("Message sent (no API configured)");
+                    r["data"]["reply"] = "";
+                    auto hr = drogon::HttpResponse::newHttpJsonResponse(r); cors(hr); cb(hr);
+                    return;
+                }
+
+                apiUrl = normalizeUrl(apiUrl);
+
+                // Build system prompt for group chat context
+                std::string identity = charSvc.readCharacterFile(targetId, "IDENTITY.md");
+                std::string soul = charSvc.readCharacterFile(targetId, "SOUL.md");
+                std::string memory = charSvc.readCharacterFile(targetId, "MEMORY.md");
+                std::string userRel = charSvc.readCharacterFile(targetId, "USER.md");
+
+                // Get recent chat history for context (last 30 lines)
+                std::string recentChat = GroupService::instance().getRecentChatLog(id, 30);
+
+                // Get member names for context
+                std::ostringstream memberList;
+                for (size_t i = 0; i < memberIds.size(); ++i) {
+                    auto mc = charSvc.getCharacter(memberIds[i]);
+                    if (!mc.id.empty()) {
+                        if (i > 0) memberList << ", ";
+                        memberList << mc.name;
+                    }
+                }
+
+                std::ostringstream sysPrompt;
+                sysPrompt << "You are roleplaying as " << targetName
+                          << " in a group chat. The group members are: "
+                          << memberList.str() << ".\n\n";
+
+                if (!identity.empty())
+                    sysPrompt << "## Your Identity\n" << identity << "\n\n";
+                if (!soul.empty())
+                    sysPrompt << "## Your Personality & Soul\n" << soul << "\n\n";
+                if (!userRel.empty())
+                    sysPrompt << "## Your Relationship with the User\n" << userRel << "\n\n";
+                if (!memory.empty())
+                    sysPrompt << "## Your Core Memories\n" << memory << "\n\n";
+
+                sysPrompt << "## Recent Group Chat History\n"
+                          << (recentChat.empty() ? "(No history yet)" : recentChat)
+                          << "\n\n";
+
+                sysPrompt << "Instructions:\n"
+                          << "- You are in a group chat. The message above is directed at you (you were @mentioned).\n"
+                          << "- Respond naturally as your character would in a group setting.\n"
+                          << "- Keep your response concise (1-3 paragraphs).\n"
+                          << "- You can refer to other group members by name if relevant.\n"
+                          << "- Reference past events from your memories and chat history when relevant.\n"
+                          << "- Stay in character at all times.\n"
+                          << "- Do NOT include roleplay markers like *action* or [narrative].";
+
+                // Capture vars for the callback
+                std::string capturedName = targetName;
+                std::string capturedId = targetId;
+
+                AIService::instance().chat(apiUrl, apiKey, apiModel,
+                    sysPrompt.str(), message,
+                    [cb, id, capturedName, capturedId, message](bool success, const std::string& aiResponse) {
+                        if (!success) {
+                            auto r = ok("Message sent (AI failed)");
+                            r["data"]["reply"] = "";
+                            auto hr = drogon::HttpResponse::newHttpJsonResponse(r); cors(hr); cb(hr);
+                            return;
+                        }
+
+                        // Append AI response to chat log
+                        std::string aiLog = "[" + capturedName + "]: " + aiResponse;
+                        GroupService::instance().appendChatLog(id, aiLog);
+
+                        auto r = ok("Message sent");
+                        r["data"]["reply"] = aiResponse;
+                        r["data"]["responder_name"] = capturedName;
+                        r["data"]["responder_id"] = capturedId;
+                        auto hr = drogon::HttpResponse::newHttpJsonResponse(r); cors(hr); cb(hr);
+                    });
+                return; // Will respond via callback
+            }
+        }
+    }
+
+    // No @mention or not from user — just log and return success with no reply
     auto r = ok("Message sent");
-    r["data"]["sender_name"] = senderName;
-    r["data"]["reply"] = "";  // no AI reply in Phase 1
+    r["data"]["reply"] = "";
     auto hr = drogon::HttpResponse::newHttpJsonResponse(r); cors(hr); cb(hr);
 }
 

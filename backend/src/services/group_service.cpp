@@ -213,6 +213,29 @@ std::string GroupService::getChatLog(const std::string& groupId) const {
     std::ostringstream oss; oss << in.rdbuf(); return oss.str();
 }
 
+std::string GroupService::getRecentChatLog(const std::string& groupId, int maxLines) const {
+    std::string fullLog = getChatLog(groupId);
+    if (fullLog.empty()) return "";
+    if (maxLines <= 0) return fullLog;
+
+    // Split by newline and take last maxLines
+    std::vector<std::string> lines;
+    std::istringstream iss(fullLog);
+    std::string line;
+    while (std::getline(iss, line)) {
+        if (!line.empty()) lines.push_back(line);
+    }
+
+    if (lines.size() <= static_cast<size_t>(maxLines)) return fullLog;
+
+    std::ostringstream oss;
+    size_t start = lines.size() - maxLines;
+    for (size_t i = start; i < lines.size(); ++i) {
+        oss << lines[i] << "\n";
+    }
+    return oss.str();
+}
+
 void GroupService::appendChatLog(const std::string& groupId, const std::string& entry) {
     std::string path = dataDir_ + "/groups/" + groupId + "/chat.log";
     std::ofstream out(path, std::ios::app);

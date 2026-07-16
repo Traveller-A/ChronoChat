@@ -39,6 +39,7 @@ public:
 
     // Chat log
     std::string getChatLog(const std::string& groupId) const;
+    std::string getRecentChatLog(const std::string& groupId, int maxLines) const;
     void appendChatLog(const std::string& groupId, const std::string& entry);
 
     std::string dataDir() const { return dataDir_; }
