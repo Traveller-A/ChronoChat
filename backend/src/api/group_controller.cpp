@@ -280,6 +280,17 @@ void GroupController::chat(const drogon::HttpRequestPtr& req, std::function<void
                 std::string recentChat = GroupService::instance().getRecentChatLog(id, 30);
                 // Replace own name so AI won't repeat past messages
                 recentChat = replaceOwnName(recentChat, targetName);
+                // Replace "Me" with configured user name so AI addresses user correctly
+                std::string userName = ConfigManager::instance().getUserName();
+                {
+                    std::string meMarker = "[Me]: ";
+                    std::string userMarker = "[" + userName + "]: ";
+                    size_t pos = 0;
+                    while ((pos = recentChat.find(meMarker, pos)) != std::string::npos) {
+                        recentChat.replace(pos, meMarker.length(), userMarker);
+                        pos += userMarker.length();
+                    }
+                }
 
                 // Get member names for context
                 std::ostringstream memberList;
@@ -290,8 +301,6 @@ void GroupController::chat(const drogon::HttpRequestPtr& req, std::function<void
                         memberList << mc.name;
                     }
                 }
-
-                std::string userName = ConfigManager::instance().getUserName();
 
                 std::ostringstream sysPrompt;
                 sysPrompt << "=== Group Chat Context ===\n"
@@ -467,9 +476,19 @@ void GroupController::autoStep(const drogon::HttpRequestPtr& req, std::function<
             std::string groupChat = GroupService::instance().getRecentChatLog(id, 30);
             // Replace own name so AI won't repeat past messages
             groupChat = replaceOwnName(groupChat, character);
+            // Replace "Me" with configured user name
+            std::string userName = ConfigManager::instance().getUserName();
+            {
+                std::string meMarker = "[Me]: ";
+                std::string userMarker = "[" + userName + "]: ";
+                size_t pos = 0;
+                while ((pos = groupChat.find(meMarker, pos)) != std::string::npos) {
+                    groupChat.replace(pos, meMarker.length(), userMarker);
+                    pos += userMarker.length();
+                }
+            }
 
             std::ostringstream sysPrompt;
-            std::string userName = ConfigManager::instance().getUserName();
             sysPrompt << "=== Group Chat Context ===\n"
                       << "You are " << character << ", and you are currently in a group chat.\n"
                       << "Group members: " << mList.str() << "\n"

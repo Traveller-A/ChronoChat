@@ -58,8 +58,19 @@ void AdminAgent::decideNextSpeaker(
 
     // Build user prompt: the chat history
     std::ostringstream userPrompt;
+    // Replace "[Me]:" with user's configured name in chat history
+    std::string historyForPrompt = chatHistory;
+    {
+        std::string meMarker = "[Me]: ";
+        std::string userMarker = "[" + ConfigManager::instance().getUserName() + "]: ";
+        size_t pos = 0;
+        while ((pos = historyForPrompt.find(meMarker, pos)) != std::string::npos) {
+            historyForPrompt.replace(pos, meMarker.length(), userMarker);
+            pos += userMarker.length();
+        }
+    }
     userPrompt << "Recent chat history:\n"
-               << (chatHistory.empty() ? "(No messages yet — the user just entered auto mode)" : chatHistory)
+               << (historyForPrompt.empty() ? "(No messages yet — the user just entered auto mode)" : historyForPrompt)
                << "\n\nDecide who should speak next.";
 
     // Call AI
