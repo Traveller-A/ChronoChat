@@ -37,6 +37,12 @@ const routes = [
     component: () => import('@/views/CharacterChatPage.vue'),
     meta: { title: 'ChronoChat - 对话' }
   },
+  {
+    path: '/characters/:id/info',
+    name: 'CharacterInfo',
+    component: () => import('@/views/CharacterInfoPage.vue'),
+    meta: { title: 'ChronoChat - 角色信息' }
+  },
   // 后续页面路由将在各 Phase 中添加
 ]
 

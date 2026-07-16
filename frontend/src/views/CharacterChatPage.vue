@@ -8,6 +8,9 @@
       </el-avatar>
       <span class="top-name">{{ charName }}</span>
 
+      <!-- 角色信息入口 -->
+      <el-button :icon="UserFilled" circle size="small" class="info-btn" @click="goInfo" title="角色信息" />
+
       <!-- 模式切换开关 -->
       <div class="mode-toggle">
         <span :class="{ active: mode === 'letter' }" @click="switchMode('letter')">
@@ -126,7 +129,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ArrowLeft, Promotion, Notebook, ChatDotRound, EditPen } from '@element-plus/icons-vue'
+import { ArrowLeft, Promotion, Notebook, ChatDotRound, EditPen, UserFilled } from '@element-plus/icons-vue'
 import { getCharacter, sendMessage, getChatHistory, getAvatarUrl } from '@/api'
 import { ElMessage } from 'element-plus'
 
@@ -279,6 +282,7 @@ async function scrollBottom() {
 }
 
 function goBack() { router.push('/characters') }
+function goInfo() { router.push(`/characters/${characterId}/info`) }
 </script>
 
 <style scoped>
@@ -300,6 +304,7 @@ function goBack() { router.push('/characters') }
 }
 .mode-toggle span.active { background: white; color: #303133; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 .api-badge { font-size: 11px; color: #909399; background: #f0f0f0; padding: 2px 8px; border-radius: 10px; }
+.info-btn { margin-right: 8px; border: none; background: #f5f5f5; }
 
 /* Messages container */
 .chat-messages { flex: 1; overflow-y: auto; padding: 16px; }

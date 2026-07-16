@@ -22,6 +22,11 @@ public:
     // Chat
     ADD_METHOD_TO(CharacterController::chat, "/api/characters/{1}/chat", drogon::Post);
     ADD_METHOD_TO(CharacterController::chatHistory, "/api/characters/{1}/history", drogon::Get);
+    // Personality
+    ADD_METHOD_TO(CharacterController::analyzePersonality, "/api/characters/{1}/analyze", drogon::Post);
+    // Export & duplicate
+    ADD_METHOD_TO(CharacterController::exportCharacter, "/api/characters/{1}/export", drogon::Get);
+    ADD_METHOD_TO(CharacterController::duplicateCharacter, "/api/characters/{1}/duplicate", drogon::Post);
     METHOD_LIST_END
 
     void list(const drogon::HttpRequestPtr& req,
@@ -55,6 +60,15 @@ public:
     void chatHistory(const drogon::HttpRequestPtr& req,
                      std::function<void(const drogon::HttpResponsePtr&)>&& callback,
                      const std::string& id);
+    void analyzePersonality(const drogon::HttpRequestPtr& req,
+                            std::function<void(const drogon::HttpResponsePtr&)>&& callback,
+                            const std::string& id);
+    void exportCharacter(const drogon::HttpRequestPtr& req,
+                         std::function<void(const drogon::HttpResponsePtr&)>&& callback,
+                         const std::string& id);
+    void duplicateCharacter(const drogon::HttpRequestPtr& req,
+                            std::function<void(const drogon::HttpResponsePtr&)>&& callback,
+                            const std::string& id);
 
 private:
     static Json::Value characterToJson(const struct CharacterInfo& c, bool includeApiKey = false);
