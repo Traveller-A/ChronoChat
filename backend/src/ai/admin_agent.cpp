@@ -58,10 +58,10 @@ void AdminAgent::decideNextSpeaker(
 
     // Build user prompt: the chat history
     std::ostringstream userPrompt;
-    // Replace "[Me]:" with user's configured name in chat history
+    // Replace "[{{user}}]:" with user's configured name in chat history
     std::string historyForPrompt = chatHistory;
     {
-        std::string meMarker = "[Me]: ";
+        std::string meMarker = "[{{user}}]: ";
         std::string userMarker = "[" + ConfigManager::instance().getUserName() + "]: ";
         size_t pos = 0;
         while ((pos = historyForPrompt.find(meMarker, pos)) != std::string::npos) {

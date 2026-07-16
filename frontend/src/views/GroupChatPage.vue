@@ -231,8 +231,8 @@ function selectMention(member) {
 
 function renderContent(content) {
   if (!content) return ''
-  // Replace "Me" placeholder with user name
-  let text = content.replace(/Me/g, userName.value)
+  // Replace {{user}} placeholder with user name
+  let text = content.replace(/\{\{user\}\}/g, userName.value)
   // Highlight @mentions
   return text.replace(/@([\w\u4e00-\u9fff]+)/g, '<span class="mention">@$1</span>')
 }
@@ -244,7 +244,7 @@ async function send() {
   showMentionList.value = false
   text.value = ''
   const now = nowTime()
-  messages.value.push({ role: 'user', sender: userName.value, senderId: '', content: msg, time: now })
+  messages.value.push({ role: 'user', sender: '{{user}}', senderId: '', content: msg, time: now })
 
   // In auto mode, pause auto-loop while waiting for manual response
   if (chatMode.value === 'auto') {
@@ -320,7 +320,7 @@ onMounted(async () => {
             messages.value.push({ role: 'system', sender: 'Admin', content, time: '' })
             return
           }
-          const isUser = (senderName === 'Me' || senderName === userName.value)
+          const isUser = (senderName === '{{user}}' || senderName === 'Me' || senderName === userName.value)
           const member = members.value.find(mb => mb.name === senderName)
           messages.value.push({
             role: isUser ? 'user' : 'char',

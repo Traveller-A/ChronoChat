@@ -189,8 +189,8 @@ void GroupController::chat(const drogon::HttpRequestPtr& req, std::function<void
 
     auto memberIds = GroupService::instance().getMemberIds(id);
 
-    // Determine sender display name (use "Me" as placeholder; replaced with userName in prompts)
-    std::string senderName = "Me";
+    // Determine sender display name ({{user}} is placeholder; replaced with userName in prompts)
+    std::string senderName = "{{user}}";
     if (!senderId.empty()) {
         auto c = CharacterService::instance().getCharacter(senderId);
         if (!c.id.empty()) senderName = c.name;
@@ -280,10 +280,10 @@ void GroupController::chat(const drogon::HttpRequestPtr& req, std::function<void
                 std::string recentChat = GroupService::instance().getRecentChatLog(id, 30);
                 // Replace own name so AI won't repeat past messages
                 recentChat = replaceOwnName(recentChat, targetName);
-                // Replace "Me" with configured user name so AI addresses user correctly
+                // Replace {{user}} with configured user name so AI addresses user correctly
                 std::string userName = ConfigManager::instance().getUserName();
                 {
-                    std::string meMarker = "[Me]: ";
+                    std::string meMarker = "[{{user}}]: ";
                     std::string userMarker = "[" + userName + "]: ";
                     size_t pos = 0;
                     while ((pos = recentChat.find(meMarker, pos)) != std::string::npos) {
@@ -477,10 +477,10 @@ void GroupController::autoStep(const drogon::HttpRequestPtr& req, std::function<
             std::string groupChat = GroupService::instance().getRecentChatLog(id, 30);
             // Replace own name so AI won't repeat past messages
             groupChat = replaceOwnName(groupChat, character);
-            // Replace "Me" with configured user name
+            // Replace {{user}} with configured user name
             std::string userName = ConfigManager::instance().getUserName();
             {
-                std::string meMarker = "[Me]: ";
+                std::string meMarker = "[{{user}}]: ";
                 std::string userMarker = "[" + userName + "]: ";
                 size_t pos = 0;
                 while ((pos = groupChat.find(meMarker, pos)) != std::string::npos) {
