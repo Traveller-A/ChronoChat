@@ -3,6 +3,7 @@
 #include <fstream>
 #include "config/config_manager.h"
 #include "services/character_service.h"
+#include "services/group_service.h"
 
 using namespace drogon;
 
@@ -35,6 +36,18 @@ int main()
         return 1;
     }
     log << "CharacterService OK" << std::endl;
+
+    // Initialize GroupService
+    log << "Initializing GroupService..." << std::endl;
+    if (!chronochat::GroupService::instance().initialize(
+            "../../../data",              // group files at ChronoChat/data/
+            "../../data/chronochat.db"))   // metadata in same DB
+    {
+        log << "GroupService init failed!" << std::endl;
+        std::cerr << "Failed to initialize GroupService!" << std::endl;
+        return 1;
+    }
+    log << "GroupService OK" << std::endl;
 
     try {
         log << "Loading config.json..." << std::endl;
