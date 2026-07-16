@@ -21,6 +21,7 @@ struct CharacterInfo {
     std::string storyText;              // immutable after creation
     std::string storyImages;
     std::string userDescription;        // character's view of the user (optional)
+    std::string lastActiveDate;         // last conversation date, for memory compression trigger
 
     // Per-character API config (stored in DB, not in files; empty = use global)
     std::string textApiBaseUrl;
@@ -52,6 +53,10 @@ public:
     std::string readCharacterFile(const std::string& id, const std::string& filename) const;
 
     std::string dataDir() const { return dataDir_; }
+
+    // Memory compression: check & trigger on date change
+    void updateLastActiveDate(const std::string& id, const std::string& date);
+    std::string getLastActiveDate(const std::string& id) const;
 
 private:
     CharacterService() = default;

@@ -106,6 +106,7 @@ bool CharacterService::ensureTables() {
             story_text      TEXT DEFAULT '',
             story_images    TEXT DEFAULT '[]',
             user_description TEXT DEFAULT '',
+            last_active_date TEXT DEFAULT '',
             text_api_base_url      TEXT DEFAULT '',
             text_api_key           TEXT DEFAULT '',
             text_model             TEXT DEFAULT '',
@@ -133,6 +134,7 @@ bool CharacterService::ensureTables() {
     migrateAddColumn("multimodal_api_base_url", "TEXT DEFAULT ''");
     migrateAddColumn("multimodal_api_key", "TEXT DEFAULT ''");
     migrateAddColumn("multimodal_model", "TEXT DEFAULT ''");
+    migrateAddColumn("last_active_date", "TEXT DEFAULT ''");
 
     return true;
 }
@@ -143,6 +145,7 @@ static const char* kListQuery = R"(
            avatar_path, story_text, story_images, user_description,
            text_api_base_url, text_api_key, text_model,
            multimodal_api_base_url, multimodal_api_key, multimodal_model,
+           last_active_date,
            created_at, updated_at
     FROM characters ORDER BY updated_at DESC;
 )";
@@ -166,8 +169,9 @@ static CharacterInfo rowToCharacter(sqlite3_stmt* stmt) {
     c.multimodalApiBaseUrl = colText(stmt, 14);
     c.multimodalApiKey = colText(stmt, 15);
     c.multimodalModel = colText(stmt, 16);
-    c.createdAt = sqlite3_column_int64(stmt, 17);
-    c.updatedAt = sqlite3_column_int64(stmt, 18);
+    c.lastActiveDate = colText(stmt, 17);
+    c.createdAt = sqlite3_column_int64(stmt, 18);
+    c.updatedAt = sqlite3_column_int64(stmt, 19);
     return c;
 }
 
@@ -195,6 +199,7 @@ CharacterInfo CharacterService::getCharacter(const std::string& id) const {
                avatar_path, story_text, story_images, user_description,
                text_api_base_url, text_api_key, text_model,
                multimodal_api_base_url, multimodal_api_key, multimodal_model,
+               last_active_date,
                created_at, updated_at
         FROM characters WHERE id = ?;
     )";
@@ -347,6 +352,33 @@ std::string CharacterService::readCharacterFile(const std::string& id, const std
     std::ostringstream oss;
     oss << in.rdbuf();
     return oss.str();
+}
+
+void CharacterService::updateLastActiveDate(const std::string& id, const std::string& date) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!db_) return;
+    const char* sql = "UPDATE characters SET last_active_date = ? WHERE id = ?;";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return;
+    sqlite3_bind_text(stmt, 1, date.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, id.c_str(), -1, SQLITE_STATIC);
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+}
+
+std::string CharacterService::getLastActiveDate(const std::string& id) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!db_) return "";
+    const char* sql = "SELECT last_active_date FROM characters WHERE id = ?;";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return "";
+    sqlite3_bind_text(stmt, 1, id.c_str(), -1, SQLITE_STATIC);
+    std::string result;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        result = colText(stmt, 0);
+    }
+    sqlite3_finalize(stmt);
+    return result;
 }
 
 } // namespace chronochat

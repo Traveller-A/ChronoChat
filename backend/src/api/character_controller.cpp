@@ -8,6 +8,8 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <thread>
+#include <ctime>
 
 namespace chronochat {
 
@@ -565,6 +567,54 @@ void CharacterController::chat(
         auto httpResp = drogon::HttpResponse::newHttpJsonResponse(resp);
         httpResp->addHeader("Access-Control-Allow-Origin", "*"); callback(httpResp); return;
     }
+
+    // --- Memory compression: check if date changed ---
+    std::string today = []{
+        std::time_t t = std::time(nullptr);
+        std::tm* tm = std::localtime(&t);
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "%04d-%02d-%02d",
+                      tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday);
+        return std::string(buf);
+    }();
+    std::string lastDate = svc.getLastActiveDate(id);
+
+    if (!lastDate.empty() && lastDate != today) {
+        // Date changed — compress yesterday's conversations into MEMORY.md
+        std::string chatLogRaw = svc.readCharacterFile(id, "CHAT_LOG.md");
+        std::string letterLogRaw = svc.readCharacterFile(id, "LETTER_LOG.md");
+        std::string oldMemory = svc.readCharacterFile(id, "MEMORY.md");
+
+        std::string compressPrompt =
+            "You are a memory summarizer. Below are conversations from " + lastDate + ".\n\n"
+            "## Instant Chat History\n" + chatLogRaw + "\n\n"
+            "## Letter Correspondence\n" + letterLogRaw + "\n\n"
+            "## Existing Core Memories\n" + oldMemory + "\n\n"
+            "Instructions:\n"
+            "- Extract KEY FACTS, character development, emotional shifts, and significant events.\n"
+            "- Preserve the character's core traits and important relationship developments.\n"
+            "- Write in third person, past tense, concise bullet points.\n"
+            "- Merge with existing memories — don't duplicate, but update if something changed.\n"
+            "- Keep it under 500 words.\n"
+            "- Output ONLY the merged memory content. No markers, no meta-commentary.";
+
+        AIService::instance().chat(apiUrl, apiKey, apiModel,
+            "You are a memory compression assistant.", compressPrompt,
+            [id, today](bool ok, const std::string& compressed) {
+                if (ok && !compressed.empty()) {
+                    CharacterService::instance().writeCharacterFile(id, "MEMORY.md", compressed);
+                }
+                // Update date regardless
+                CharacterService::instance().updateLastActiveDate(id, today);
+            });
+
+        // Wait briefly for compression (max 15s) before proceeding
+        // In production this would be fully async; for now, simple delay
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+    }
+
+    // Update last active date
+    svc.updateLastActiveDate(id, today);
 
     // Determine log file based on mode
     std::string logFile = (mode == "letter") ? "LETTER_LOG.md" : "CHAT_LOG.md";
