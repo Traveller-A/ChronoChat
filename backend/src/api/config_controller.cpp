@@ -48,6 +48,8 @@ void ConfigController::getConfig(
     data["multimodal_api_has_key"] = !multiKey.empty();
     data["multimodal_model"] = cfg.getMultimodalModel();
 
+    data["user_name"] = cfg.getUserName();
+
     Json::Value resp;
     resp["code"] = 0;
     resp["message"] = "ok";
@@ -104,6 +106,9 @@ void ConfigController::saveConfig(
 
     if (json->isMember("multimodal_model"))
         cfg.setMultimodalModel((*json)["multimodal_model"].asString());
+
+    if (json->isMember("user_name"))
+        cfg.setUserName((*json)["user_name"].asString());
 
     bool saved = cfg.saveToDb();
 

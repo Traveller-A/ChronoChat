@@ -32,6 +32,10 @@ public:
     std::string getMultimodalModel() const;
     void setMultimodalModel(const std::string& model);
 
+    // User display name
+    std::string getUserName() const;
+    void setUserName(const std::string& name);
+
     // Persistence
     bool loadFromDb();
     bool saveToDb();
@@ -60,6 +64,7 @@ private:
     std::string multimodalApiBaseUrl_;
     std::string multimodalApiKey_;
     std::string multimodalModel_;
+    std::string userName_;
 };
 
 } // namespace chronochat

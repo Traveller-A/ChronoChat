@@ -36,7 +36,7 @@ void AdminAgent::decideNextSpeaker(
     std::ostringstream sysPrompt;
     sysPrompt << "You are the admin agent for a group chat named \"" << groupName << "\".\n"
               << "Group members: " << memberList << "\n"
-              << "There is also a human user named 'Me' who can speak at any time.\n\n"
+              << "There is also a human user named '" << ConfigManager::instance().getUserName() << "' who can speak at any time.\n\n"
               << "Your job is to look at the recent conversation and decide which character should speak next.\n"
               << "This creates natural, flowing conversations between group members.\n\n"
               << "Decision rules:\n"

@@ -82,6 +82,18 @@
         </div>
       </div>
 
+      <!-- User Name -->
+      <div class="config-section user-section">
+        <h3 class="section-title">
+          <el-icon><UserFilled /></el-icon> 用户昵称
+        </h3>
+        <el-form label-position="top" size="large">
+          <el-form-item label="角色将以此名称称呼你">
+            <el-input v-model="form.user_name" placeholder="旅人" clearable />
+          </el-form-item>
+        </el-form>
+      </div>
+
       <div class="bottom-actions">
         <el-button type="success" size="large" :loading="saving" @click="saveSettings">
           <el-icon><Check /></el-icon> 保存配置
@@ -97,7 +109,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft } from '@element-plus/icons-vue'
+import { ArrowLeft, UserFilled } from '@element-plus/icons-vue'
 import { getConfig, saveConfig, testTextApi, testMultimodalApi } from '@/api'
 import { ElMessage } from 'element-plus'
 
@@ -109,7 +121,8 @@ const form = reactive({
   text_model: '',
   multimodal_api_base_url: '',
   multimodal_api_key: '',
-  multimodal_model: ''
+  multimodal_model: '',
+  user_name: ''
 })
 
 const textApiHasKey = ref(false)
@@ -148,6 +161,7 @@ onMounted(async () => {
       // Never populate the actual key into the input
       form.text_api_key = ''
       form.multimodal_api_key = ''
+      form.user_name = res.data.user_name || '旅人'
     }
   } catch (err) {
     console.warn('Failed to load config:', err.message)
@@ -167,7 +181,8 @@ async function saveSettings() {
       text_model: form.text_model,
       multimodal_api_base_url: form.multimodal_api_base_url,
       multimodal_api_key: form.multimodal_api_key,
-      multimodal_model: form.multimodal_model
+      multimodal_model: form.multimodal_model,
+      user_name: form.user_name
     }
     const res = await saveConfig(payload)
     if (res.code === 0) {

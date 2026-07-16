@@ -105,6 +105,7 @@ bool ConfigManager::loadFromDb() {
     multimodalApiBaseUrl_ = getDbValue("multimodal_api_base_url");
     multimodalApiKey_     = getDbValue("multimodal_api_key");
     multimodalModel_      = getDbValue("multimodal_model");
+    userName_             = getDbValue("user_name", "\xe6\x97\x85\xe4\xba\xba"); // default: 旅人
 
     std::cout << "[ConfigManager] Config loaded from database" << std::endl;
     return true;
@@ -120,6 +121,7 @@ bool ConfigManager::saveToDb() {
     ok &= setDbValue("multimodal_api_base_url",  multimodalApiBaseUrl_);
     ok &= setDbValue("multimodal_api_key",       multimodalApiKey_);
     ok &= setDbValue("multimodal_model",         multimodalModel_);
+    ok &= setDbValue("user_name",                userName_);
 
     return ok;
 }
@@ -178,6 +180,15 @@ std::string ConfigManager::getMultimodalModel() const {
 void ConfigManager::setMultimodalModel(const std::string& model) {
     std::lock_guard<std::mutex> lock(mutex_);
     multimodalModel_ = model;
+}
+
+std::string ConfigManager::getUserName() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return userName_.empty() ? "\xe6\x97\x85\xe4\xba\xba" : userName_; // 旅人
+}
+void ConfigManager::setUserName(const std::string& name) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    userName_ = name;
 }
 
 } // namespace chronochat

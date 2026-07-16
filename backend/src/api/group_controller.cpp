@@ -291,11 +291,13 @@ void GroupController::chat(const drogon::HttpRequestPtr& req, std::function<void
                     }
                 }
 
+                std::string userName = ConfigManager::instance().getUserName();
+
                 std::ostringstream sysPrompt;
                 sysPrompt << "=== Group Chat Context ===\n"
                           << "You are " << targetName << ", and you are currently in a group chat.\n"
                           << "Group members: " << memberList.str() << "\n"
-                          << "The user 'Me' is also in this group.\n"
+                          << "The user '" << userName << "' is also in this group.\n"
                           << "When someone sends a message starting with @" << targetName
                           << ", they are speaking directly to you.\n\n";
 
@@ -467,10 +469,11 @@ void GroupController::autoStep(const drogon::HttpRequestPtr& req, std::function<
             groupChat = replaceOwnName(groupChat, character);
 
             std::ostringstream sysPrompt;
+            std::string userName = ConfigManager::instance().getUserName();
             sysPrompt << "=== Group Chat Context ===\n"
                       << "You are " << character << ", and you are currently in a group chat.\n"
                       << "Group members: " << mList.str() << "\n"
-                      << "The user 'Me' is also in this group.\n"
+                      << "The user '" << userName << "' is also in this group.\n"
                       << "You have been chosen to speak next by the conversation moderator.\n\n";
 
             if (!identity.empty())
