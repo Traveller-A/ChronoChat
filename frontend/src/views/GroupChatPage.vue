@@ -297,6 +297,9 @@ onMounted(async () => {
     const [gr, hr, cfg] = await Promise.all([getGroup(gid), getGroupHistory(gid), getConfig()])
     if (cfg.code === 0 && cfg.data && cfg.data.user_name) {
       userName.value = cfg.data.user_name
+      console.log('[GroupChat] User name from config:', userName.value)
+    } else {
+      console.log('[GroupChat] Config failed or no user_name, using default:', userName.value, cfg)
     }
     if (gr.code === 0) {
       group.value = gr.data
@@ -326,6 +329,7 @@ onMounted(async () => {
             content,
             time: ''
           })
+          if (isUser) console.log('[GroupChat] History user msg, display as:', userName.value)
         }
       })
     }
