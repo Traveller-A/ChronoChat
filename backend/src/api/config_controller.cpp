@@ -218,6 +218,41 @@ void ConfigController::testMultimodalApi(
         });
 }
 
+// ---- Clear all API configurations (global + per-character) ----
+
+void ConfigController::clearApi(
+    const drogon::HttpRequestPtr& req,
+    std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+{
+    auto& cfg = ConfigManager::instance();
+    // Wipe global text + multimodal API config (URL / key / model)
+    cfg.setTextApiBaseUrl("");
+    cfg.setTextApiKey("");
+    cfg.setTextModel("");
+    cfg.setMultimodalApiBaseUrl("");
+    cfg.setMultimodalApiKey("");
+    cfg.setMultimodalModel("");
+    bool globalOk = cfg.saveToDb();
+
+    // Wipe every character's per-character API config
+    bool charOk = CharacterService::instance().clearAllCharacterApi();
+
+    Json::Value data;
+    data["global_cleared"] = globalOk;
+    data["characters_cleared"] = charOk;
+
+    Json::Value resp;
+    resp["code"] = (globalOk && charOk) ? 0 : 1;
+    resp["message"] = (globalOk && charOk)
+        ? "All API configurations cleared"
+        : "Partial failure while clearing API configurations";
+    resp["data"] = data;
+
+    auto httpResp = drogon::HttpResponse::newHttpJsonResponse(resp);
+    httpResp->addHeader("Access-Control-Allow-Origin", "*");
+    callback(httpResp);
+}
+
 // ---- User avatar ----
 
 static const std::string b64Chars =

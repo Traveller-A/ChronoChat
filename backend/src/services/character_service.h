@@ -62,6 +62,10 @@ public:
     // most recently chatted characters first.
     void touchLastChatAt(const std::string& id);
 
+    // Bulk-clear every character's per-character API config (text + multimodal
+    // base URL / key / model). Used by the "clear all API" settings action.
+    bool clearAllCharacterApi();
+
 private:
     CharacterService() = default;
     CharacterService(const CharacterService&) = delete;

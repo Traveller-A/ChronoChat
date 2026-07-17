@@ -16,6 +16,8 @@ public:
     ADD_METHOD_TO(ConfigController::testTextApi, "/api/config/test-text", drogon::Post);
     // POST /api/config/test-multimodal -> test multimodal API connection
     ADD_METHOD_TO(ConfigController::testMultimodalApi, "/api/config/test-multimodal", drogon::Post);
+    // POST /api/config/clear-api -> clear ALL API config (global + every character's)
+    ADD_METHOD_TO(ConfigController::clearApi, "/api/config/clear-api", drogon::Post);
     // GET    /api/config/avatar -> serve the current user avatar image
     ADD_METHOD_TO(ConfigController::getAvatar, "/api/config/avatar", drogon::Get);
     // POST   /api/config/avatar -> upload (base64) a new user avatar
@@ -35,6 +37,9 @@ public:
 
     void testMultimodalApi(const drogon::HttpRequestPtr& req,
                            std::function<void(const drogon::HttpResponsePtr&)>&& callback);
+
+    void clearApi(const drogon::HttpRequestPtr& req,
+                  std::function<void(const drogon::HttpResponsePtr&)>&& callback);
 
     void getAvatar(const drogon::HttpRequestPtr& req,
                    std::function<void(const drogon::HttpResponsePtr&)>&& callback);

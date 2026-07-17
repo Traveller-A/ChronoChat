@@ -440,4 +440,26 @@ void CharacterService::touchLastChatAt(const std::string& id) {
     sqlite3_finalize(stmt);
 }
 
+bool CharacterService::clearAllCharacterApi() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!db_) return false;
+    const char* sql = R"(
+        UPDATE characters SET
+            text_api_base_url='',
+            text_api_key='',
+            text_model='',
+            multimodal_api_base_url='',
+            multimodal_api_key='',
+            multimodal_model='',
+            updated_at=?
+        WHERE 1=1;
+    )";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
+    sqlite3_bind_int64(stmt, 1, nowMs());
+    bool ok = sqlite3_step(stmt) == SQLITE_DONE;
+    sqlite3_finalize(stmt);
+    return ok;
+}
+
 } // namespace chronochat

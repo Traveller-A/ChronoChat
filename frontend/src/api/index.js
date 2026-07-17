@@ -71,6 +71,13 @@ export function testMultimodalApi() {
 }
 
 /**
+ * 一键清除所有 API 配置（全局文本/多模态 API + 全部角色专属 API）
+ */
+export function clearAllApiConfig() {
+  return apiClient.post('/config/clear-api')
+}
+
+/**
  * 用户头像 URL（始终为同一地址，更换头像后用 ?t= 时间戳刷新缓存）
  */
 export function getUserAvatarUrl() {

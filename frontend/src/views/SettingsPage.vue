@@ -97,6 +97,13 @@
           <el-icon><Connection /></el-icon> 全部连接测试
         </el-button>
       </div>
+
+      <div class="danger-zone">
+        <el-button type="danger" size="large" :loading="clearing" @click="clearAllApi">
+          <el-icon><Delete /></el-icon> 一键清除所有 API 配置
+        </el-button>
+        <p class="danger-hint">清除全局文本/多模态 API 及全部角色专属 API（Base URL / Key / Model），操作不可撤销</p>
+      </div>
     </div>
   </div>
 </template>
@@ -107,9 +114,9 @@ import { useRouter } from 'vue-router'
 import { ArrowLeft, UserFilled } from '@element-plus/icons-vue'
 import {
   getConfig, saveConfig, testTextApi, testMultimodalApi,
-  getUserAvatarUrl, uploadUserAvatar, removeUserAvatar
+  getUserAvatarUrl, uploadUserAvatar, removeUserAvatar, clearAllApiConfig
 } from '@/api'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 
@@ -136,6 +143,7 @@ const testingMultimodal = ref(false)
 const testingBoth = ref(false)
 const testTextResult = ref(null)
 const testMultimodalResult = ref(null)
+const clearing = ref(false)
 
 // User avatar
 const userAvatarSet = ref(false)
@@ -231,6 +239,44 @@ async function removeAvatar() {
     ElMessage.error('移除失败: ' + err.message)
   } finally {
     removingAvatar.value = false
+  }
+}
+
+async function clearAllApi() {
+  try {
+    await ElMessageBox.confirm(
+      '将清除全局文本 API、全局多模态 API 以及所有角色的专属 API 配置（Base URL / Key / Model）。此操作不可撤销，是否继续？',
+      '一键清除所有 API 配置',
+      { confirmButtonText: '清除', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch { return }  // user cancelled
+
+  clearing.value = true
+  try {
+    const res = await clearAllApiConfig()
+    if (res.code === 0) {
+      ElMessage.success('已清除所有 API 配置')
+      // Refresh local form state from backend (all API fields now empty)
+      const fresh = await getConfig()
+      if (fresh.code === 0 && fresh.data) {
+        form.text_api_base_url = fresh.data.text_api_base_url || ''
+        form.text_model = fresh.data.text_model || ''
+        form.multimodal_api_base_url = fresh.data.multimodal_api_base_url || ''
+        form.multimodal_model = fresh.data.multimodal_model || ''
+        textApiHasKey.value = false
+        multiApiHasKey.value = false
+        textKeyPlaceholder.value = 'sk-xxxxxxxx'
+        multiKeyPlaceholder.value = 'sk-xxxxxxxx'
+        form.text_api_key = ''
+        form.multimodal_api_key = ''
+      }
+    } else {
+      ElMessage.error(res.message || '清除失败')
+    }
+  } catch (err) {
+    ElMessage.error('清除失败: ' + err.message)
+  } finally {
+    clearing.value = false
   }
 }
 
@@ -379,6 +425,15 @@ async function testAll() {
 .test-result.error { color: var(--rust); background: rgba(199, 107, 90, 0.12); border: 1px solid rgba(199, 107, 90, 0.3); }
 
 .bottom-actions { display: flex; justify-content: center; gap: 20px; padding: 28px 0 8px; }
+
+.danger-zone {
+  margin-top: 18px; padding: 22px 0 8px; border-top: 1px solid var(--ink-500);
+  text-align: center;
+}
+.danger-hint {
+  margin: 10px 0 0; font-size: 12px; color: var(--star-faint);
+  font-family: var(--font-mono); letter-spacing: 0.02em; line-height: 1.6;
+}
 
 @media (max-width: 768px) {
   .config-grid { grid-template-columns: 1fr; }
