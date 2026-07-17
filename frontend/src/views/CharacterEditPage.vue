@@ -1,5 +1,5 @@
 <template>
-  <div class="edit-page">
+  <div class="page edit-page">
     <div class="top-bar">
       <el-button :icon="ArrowLeft" circle class="back-btn" @click="handleBack" />
       <span class="page-title">编辑角色</span>
@@ -11,8 +11,8 @@
         <!-- 头像 -->
         <el-form-item label="头像">
           <div class="avatar-upload" @click="triggerUpload">
-            <el-avatar :size="100" :src="avatarPreview || avatarSrc" shape="square">
-              <el-icon :size="40"><Plus /></el-icon>
+            <el-avatar :size="100" :src="avatarPreview || avatarSrc" shape="square" class="avatar-box">
+              <el-icon :size="36"><Plus /></el-icon>
             </el-avatar>
             <span class="avatar-hint">点击更换头像</span>
           </div>
@@ -43,10 +43,10 @@
               <el-checkbox v-model="birthdayNoYear" size="small" class="bday-check">仅月日</el-checkbox>
             </div>
             <div v-if="birthdayNoYear" class="bday-monthday">
-              <el-select v-model="birthdayMonth" placeholder="月" style="width:90px" clearable>
+              <el-select v-model="birthdayMonth" placeholder="月" style="width:96px" clearable>
                 <el-option v-for="m in 12" :key="m" :label="m+'月'" :value="m" />
               </el-select>
-              <el-select v-model="birthdayDay" placeholder="日" style="width:90px;margin-left:8px" clearable>
+              <el-select v-model="birthdayDay" placeholder="日" style="width:96px;margin-left:8px" clearable>
                 <el-option v-for="d in 31" :key="d" :label="d+'日'" :value="d" />
               </el-select>
             </div>
@@ -69,7 +69,7 @@
             placeholder="角色是如何看待你的？" />
         </el-form-item>
 
-        <!-- ====== 角色专属API配置 ====== -->
+        <!-- 角色专属 API -->
         <el-collapse class="api-collapse">
           <el-collapse-item title="角色专属 API 配置（留空使用全局API）" name="api">
             <div class="config-grid">
@@ -330,22 +330,53 @@ function handleBack() { router.push('/characters') }
 </script>
 
 <style scoped>
-.edit-page { min-height: 100vh; background: #f0f2f5; }
-.top-bar { display: flex; align-items: center; padding: 16px 24px; background: white; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-.back-btn { border: none; background: #f5f5f5; }
-.page-title { margin-left: 16px; font-size: 20px; font-weight: 600; }
-.form-container { max-width: 720px; margin: 24px auto; padding: 28px; background: white; border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.04); }
+.edit-page { padding-bottom: 80px; }
+
+.top-bar { display: flex; align-items: center; gap: 14px; padding: 8px 0 32px; }
+.back-btn {
+  background: var(--ink-700) !important; border-color: var(--ink-500) !important; color: var(--star-soft) !important;
+}
+.back-btn:hover { border-color: var(--gold-dim) !important; color: var(--gold) !important; }
+.page-title {
+  font-family: var(--font-serif); font-size: var(--fs-xl); font-weight: 600;
+  color: var(--star); letter-spacing: 0.02em;
+}
+
+.form-container {
+  max-width: 740px; margin: 0 auto; padding: 30px 32px;
+  background: var(--ink-700); border: 1px solid var(--ink-500);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+}
+
 .avatar-upload { text-align: center; cursor: pointer; }
-.avatar-hint { display: block; margin-top: 8px; font-size: 13px; color: #909399; }
-.row-two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.readonly-hint { font-size: 12px; color: #909399; }
+.avatar-box {
+  background: var(--ink-600); color: var(--star-dim);
+  border-radius: 14px; box-shadow: 0 0 0 1px var(--ink-500); transition: all 0.2s ease;
+}
+.avatar-upload:hover .avatar-box { box-shadow: 0 0 0 1px var(--gold-dim), 0 0 18px rgba(230, 181, 102, 0.2); color: var(--gold); }
+.avatar-hint { display: block; margin-top: 10px; font-size: 12px; color: var(--star-dim); font-family: var(--font-mono); letter-spacing: 0.04em; }
+
+.row-two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.readonly-hint { font-size: 12px; color: var(--star-faint); font-family: var(--font-mono); }
+.birthday-wrap { display: flex; align-items: center; gap: 12px; width: 100%; }
+.bday-check { flex-shrink: 0; }
+.bday-monthday { display: flex; margin-top: 8px; }
 
 .api-collapse { margin-top: 8px; }
 .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-.config-sub h4 { display: flex; align-items: center; gap: 6px; font-size: 14px; color: #606266; margin: 0 0 8px; }
-.test-msg { display: inline-block; margin-left: 10px; font-size: 12px; }
-.test-msg.ok { color: #67c23a; }
-.test-msg.fail { color: #f56c6c; }
+.config-sub h4 { display: flex; align-items: center; gap: 7px; font-size: 14px; color: var(--star-soft); margin: 0 0 10px; }
+.config-sub h4 .el-icon { color: var(--gold); }
+.test-msg { display: inline-block; margin-left: 10px; font-size: 12px; font-family: var(--font-mono); }
+.test-msg.ok { color: var(--cyan); }
+.test-msg.fail { color: var(--rust); }
 
-.bottom-actions { display: flex; justify-content: center; gap: 16px; padding-top: 24px; border-top: 1px solid #ebeef5; margin-top: 24px; }
+.bottom-actions {
+  display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;
+  padding-top: 26px; border-top: 1px solid var(--ink-500); margin-top: 26px;
+}
+
+@media (max-width: 640px) {
+  .row-two, .config-grid { grid-template-columns: 1fr; }
+  .form-container { padding: 22px 18px; }
+}
 </style>

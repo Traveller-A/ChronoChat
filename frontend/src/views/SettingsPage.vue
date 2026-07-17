@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-page">
+  <div class="page settings-page">
     <div class="top-bar">
       <el-button :icon="ArrowLeft" circle class="back-btn" @click="goBack" />
       <span class="page-title">设置</span>
@@ -8,7 +8,7 @@
 
     <div class="settings-form">
       <div class="config-grid">
-        <!-- Left: Text API -->
+        <!-- 文本 API -->
         <div class="config-section">
           <h3 class="section-title">
             <el-icon><ChatLineSquare /></el-icon> 文本处理 API
@@ -18,14 +18,7 @@
               <el-input v-model="form.text_api_base_url" placeholder="https://api.openai.com/v1" clearable />
             </el-form-item>
             <el-form-item label="API Key">
-              <!-- Show masked key as placeholder; user types new key to replace -->
-              <el-input
-                v-model="form.text_api_key"
-                :placeholder="textKeyPlaceholder"
-                type="password"
-                show-password
-                clearable
-              />
+              <el-input v-model="form.text_api_key" :placeholder="textKeyPlaceholder" type="password" show-password clearable />
               <template v-if="textApiHasKey" #error>
                 <span class="key-hint">Key 已配置，输入新 Key 将覆盖旧 Key</span>
               </template>
@@ -42,23 +35,17 @@
           </p>
         </div>
 
-        <!-- Right: Multimodal API -->
+        <!-- 多模态 API -->
         <div class="config-section">
           <h3 class="section-title">
-            <el-icon><PictureFilled /></el-icon> 多模态 API <el-tag size="small" type="info">选填</el-tag>
+            <el-icon><PictureFilled /></el-icon> 多模态 API <el-tag size="small" type="info" effect="dark">选填</el-tag>
           </h3>
           <el-form label-position="top" size="large">
             <el-form-item label="Base URL">
               <el-input v-model="form.multimodal_api_base_url" placeholder="https://api.openai.com/v1" clearable />
             </el-form-item>
             <el-form-item label="API Key">
-              <el-input
-                v-model="form.multimodal_api_key"
-                :placeholder="multiKeyPlaceholder"
-                type="password"
-                show-password
-                clearable
-              />
+              <el-input v-model="form.multimodal_api_key" :placeholder="multiKeyPlaceholder" type="password" show-password clearable />
               <template v-if="multiApiHasKey" #error>
                 <span class="key-hint">Key 已配置，输入新 Key 将覆盖旧 Key</span>
               </template>
@@ -67,13 +54,7 @@
               <el-input v-model="form.multimodal_model" placeholder="gpt-4o / gpt-4-vision" clearable />
             </el-form-item>
           </el-form>
-          <el-button
-            type="primary"
-            :loading="testingMultimodal"
-            :disabled="!form.multimodal_api_base_url || (!form.multimodal_api_key && !multiApiHasKey)"
-            @click="testMultimodal"
-            class="test-btn"
-          >
+          <el-button type="primary" :loading="testingMultimodal" :disabled="!form.multimodal_api_base_url || (!form.multimodal_api_key && !multiApiHasKey)" @click="testMultimodal" class="test-btn">
             <el-icon><Connection /></el-icon> 测试多模态 API
           </el-button>
           <p v-if="testMultimodalResult" :class="['test-result', testMultimodalResult.ok ? 'success' : 'error']">
@@ -82,7 +63,7 @@
         </div>
       </div>
 
-      <!-- User Name -->
+      <!-- 用户昵称 -->
       <div class="config-section user-section">
         <h3 class="section-title">
           <el-icon><UserFilled /></el-icon> 用户昵称
@@ -95,7 +76,7 @@
       </div>
 
       <div class="bottom-actions">
-        <el-button type="success" size="large" :loading="saving" @click="saveSettings">
+        <el-button type="primary" size="large" :loading="saving" @click="saveSettings">
           <el-icon><Check /></el-icon> 保存配置
         </el-button>
         <el-button type="primary" size="large" :loading="testingBoth" @click="testAll">
@@ -259,105 +240,51 @@ async function testAll() {
 </script>
 
 <style scoped>
-.settings-page {
-  min-height: 100vh;
-  background: #f0f2f5;
-}
+.settings-page { padding-bottom: 80px; }
 
-.top-bar {
-  display: flex;
-  align-items: center;
-  padding: 16px 24px;
-  background: white;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-}
-
+.top-bar { display: flex; align-items: center; gap: 14px; padding: 8px 0 32px; }
 .back-btn {
-  border: none;
-  background: #f5f5f5;
+  background: var(--ink-700) !important; border-color: var(--ink-500) !important; color: var(--star-soft) !important;
 }
-
+.back-btn:hover { border-color: var(--gold-dim) !important; color: var(--gold) !important; }
 .page-title {
-  margin-left: 16px;
-  font-size: 20px;
-  font-weight: 600;
-  color: #303133;
+  font-family: var(--font-serif); font-size: var(--fs-xl); font-weight: 600;
+  color: var(--star); letter-spacing: 0.02em;
 }
+.spacer { flex: 1; }
 
-.spacer {
-  flex: 1;
-}
+.settings-form { max-width: 1000px; margin: 0 auto; }
 
-.settings-form {
-  max-width: 1000px;
-  margin: 32px auto;
-  padding: 0 24px;
-}
-
-.config-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 32px;
-  margin-bottom: 32px;
-}
+.config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
 
 .config-section {
-  background: white;
-  border-radius: 12px;
-  padding: 28px;
-  box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+  background: var(--ink-700); border: 1px solid var(--ink-500);
+  border-radius: var(--radius); padding: 26px 28px;
+  box-shadow: var(--shadow-card);
 }
 
 .section-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 17px;
-  font-weight: 600;
-  color: #303133;
-  margin: 0 0 24px 0;
-  padding-bottom: 14px;
-  border-bottom: 1px solid #ebeef5;
+  display: flex; align-items: center; gap: 9px;
+  font-family: var(--font-serif); font-size: 17px; font-weight: 600;
+  color: var(--star); margin: 0 0 22px; padding-bottom: 14px;
+  border-bottom: 1px solid var(--ink-500);
 }
+.section-title .el-icon { color: var(--gold); }
 
-.key-hint {
-  font-size: 12px;
-  color: #909399;
-  margin-left: 4px;
-}
+.key-hint { font-size: 12px; color: var(--cyan); margin-left: 2px; font-family: var(--font-mono); letter-spacing: 0.02em; }
 
-.test-btn {
-  width: 100%;
-  margin-top: 4px;
-}
+.test-btn { width: 100%; margin-top: 4px; }
 
 .test-result {
-  margin-top: 12px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 13px;
+  margin-top: 14px; padding: 10px 14px; border-radius: var(--radius-sm);
+  font-size: 13px; font-family: var(--font-mono); letter-spacing: 0.02em;
 }
+.test-result.success { color: var(--cyan); background: rgba(94, 179, 196, 0.1); border: 1px solid rgba(94, 179, 196, 0.3); }
+.test-result.error { color: var(--rust); background: rgba(199, 107, 90, 0.12); border: 1px solid rgba(199, 107, 90, 0.3); }
 
-.test-result.success {
-  color: #67c23a;
-  background: #f0f9eb;
-}
-
-.test-result.error {
-  color: #f56c6c;
-  background: #fef0f0;
-}
-
-.bottom-actions {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  padding: 24px 0;
-}
+.bottom-actions { display: flex; justify-content: center; gap: 20px; padding: 28px 0 8px; }
 
 @media (max-width: 768px) {
-  .config-grid {
-    grid-template-columns: 1fr;
-  }
+  .config-grid { grid-template-columns: 1fr; }
 }
 </style>

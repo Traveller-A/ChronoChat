@@ -1,5 +1,5 @@
 <template>
-  <div class="list-page">
+  <div class="page list-page">
     <div class="top-bar">
       <el-button :icon="ArrowLeft" circle class="back-btn" @click="goHome" />
       <span class="page-title">角色列表</span>
@@ -10,7 +10,7 @@
 
     <!-- Empty state -->
     <div v-if="!loading && characters.length === 0" class="empty-state">
-      <el-icon :size="64" color="#c0c4cc"><UserFilled /></el-icon>
+      <div class="empty-icon"><el-icon :size="30"><UserFilled /></el-icon></div>
       <p>还没有角色呢，点击右上角 + 号创建你的第一个时空旅人吧</p>
     </div>
 
@@ -22,7 +22,7 @@
         class="char-item"
         @click="goChat(char.id)"
       >
-        <el-avatar :size="52" :src="getAvatarUrl(char.id)" class="char-avatar">
+        <el-avatar :size="54" :src="getAvatarUrl(char.id)" class="char-avatar">
           {{ char.name.charAt(0) }}
         </el-avatar>
         <div class="char-info">
@@ -64,29 +64,97 @@ function goEdit(id) { router.push(`/characters/${id}/edit`) }
 </script>
 
 <style scoped>
-.list-page { min-height: 100vh; background: #f0f2f5; }
+.list-page { padding-bottom: 80px; }
+
 .top-bar {
-  display: flex; align-items: center; padding: 16px 24px;
-  background: white; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0 32px;
 }
-.back-btn { border: none; background: #f5f5f5; }
-.page-title { margin: 0 16px; flex: 1; font-size: 20px; font-weight: 600; }
+.back-btn {
+  background: var(--ink-700) !important;
+  border-color: var(--ink-500) !important;
+  color: var(--star-soft) !important;
+}
+.back-btn:hover { border-color: var(--gold-dim) !important; color: var(--gold) !important; }
+.page-title {
+  flex: 1;
+  font-family: var(--font-serif);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  color: var(--star);
+  letter-spacing: 0.02em;
+}
+.add-btn { flex: none; }
 
 .empty-state {
-  text-align: center; padding: 120px 20px; color: #909399;
+  text-align: center;
+  padding: 90px 24px;
+  color: var(--star-dim);
 }
-.empty-state p { margin-top: 20px; font-size: 15px; }
+.empty-icon {
+  width: 72px; height: 72px;
+  margin: 0 auto 18px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--ink-500);
+  background: radial-gradient(circle at 50% 40%, var(--ink-600), var(--ink-800));
+  color: var(--star-dim);
+}
+.empty-state p { font-size: 15px; line-height: 1.7; max-width: 340px; margin: 0 auto; }
 
-.char-list { max-width: 700px; margin: 16px auto; padding: 0 16px; }
+.char-list { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
 .char-item {
-  display: flex; align-items: center; padding: 16px; margin-bottom: 8px;
-  background: white; border-radius: 12px; cursor: pointer;
-  transition: all 0.2s; box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  background: var(--ink-700);
+  border: 1px solid var(--ink-500);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.25s ease;
 }
-.char-item:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-.char-avatar { margin-right: 14px; flex-shrink: 0; }
+.char-item:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold-dim);
+  box-shadow: var(--shadow-card);
+}
+.char-avatar {
+  flex-shrink: 0;
+  background: var(--ink-600);
+  color: var(--gold);
+  font-family: var(--font-serif);
+  font-weight: 600;
+  box-shadow: 0 0 0 2px var(--ink-700), 0 0 0 3px var(--gold-dim), 0 0 18px rgba(230, 181, 102, 0.2);
+}
 .char-info { flex: 1; min-width: 0; }
-.char-name { font-size: 16px; font-weight: 600; color: #303133; }
-.char-signature { font-size: 13px; color: #909399; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.edit-btn { flex-shrink: 0; }
+.char-name {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--star);
+  letter-spacing: 0.02em;
+}
+.char-signature {
+  font-size: 13px;
+  color: var(--star-dim);
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.edit-btn {
+  flex-shrink: 0;
+  background: var(--ink-600) !important;
+  border-color: var(--ink-500) !important;
+  color: var(--star-dim) !important;
+}
+.edit-btn:hover { border-color: var(--gold-dim) !important; color: var(--gold) !important; }
+
+@media (max-width: 600px) {
+  .char-item { padding: 14px; gap: 12px; }
+  .char-name { font-size: 16px; }
+}
 </style>

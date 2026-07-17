@@ -1,7 +1,7 @@
 <template>
-  <div class="manage-page">
+  <div class="page manage-page">
     <div class="top-bar">
-      <el-button :icon="ArrowLeft" circle @click="goChat" />
+      <el-button :icon="ArrowLeft" circle class="back-btn" @click="goChat" />
       <span class="page-title">群聊管理</span>
     </div>
 
@@ -10,10 +10,9 @@
       <div class="section">
         <h3>基本信息</h3>
         <el-form label-position="top" size="large">
-          <!-- 头像 -->
           <el-form-item label="群聊头像">
             <div class="avatar-row">
-              <el-avatar :size="80" :src="avatarUrl" shape="square">
+              <el-avatar :size="80" :src="avatarUrl" shape="square" class="g-avatar">
                 {{ form.name?.charAt(0) }}
               </el-avatar>
               <el-upload
@@ -36,7 +35,7 @@
           </el-form-item>
 
           <el-form-item label="当前模式">
-            <el-tag>{{ form.mode === 'auto' ? '自动对话' : '@提及' }}</el-tag>
+            <el-tag effect="dark">{{ form.mode === 'auto' ? '自动对话' : '@提及' }}</el-tag>
           </el-form-item>
 
           <el-button type="primary" :loading="saving" @click="saveInfo">保存信息</el-button>
@@ -45,18 +44,19 @@
 
       <!-- 成员管理 -->
       <div class="section">
-        <h3>成员管理 ({{ members.length }})</h3>
+        <h3>成员管理 <span class="count">({{ members.length }})</span></h3>
         <div class="member-list">
           <div v-for="m in members" :key="m.id" class="member-row">
-            <el-avatar :size="36" :src="getAvatarUrl(m.id)">{{ m.name?.charAt(0) }}</el-avatar>
+            <el-avatar :size="38" :src="getAvatarUrl(m.id)" class="m-avatar">{{ m.name?.charAt(0) }}</el-avatar>
             <span class="member-name">{{ m.name }}</span>
             <el-button type="danger" size="small" circle :icon="Close" @click="removeMember(m)" />
           </div>
+          <div v-if="members.length === 0" class="no-data">暂无成员</div>
         </div>
         <div class="add-member">
           <el-select v-model="newMemberId" placeholder="选择要添加的角色..." filterable size="large" style="flex:1">
             <el-option v-for="c in availableChars" :key="c.id" :label="c.name" :value="c.id">
-              <el-avatar :size="24" :src="getAvatarUrl(c.id)">{{ c.name?.charAt(0) }}</el-avatar>
+              <el-avatar :size="24" :src="getAvatarUrl(c.id)" class="opt-avatar">{{ c.name?.charAt(0) }}</el-avatar>
               <span style="margin-left:8px">{{ c.name }}</span>
             </el-option>
           </el-select>
@@ -64,7 +64,7 @@
         </div>
       </div>
 
-      <!-- 危险区域 -->
+      <!-- 危险操作 -->
       <div class="section danger-section">
         <h3>危险操作</h3>
         <el-button type="danger" @click="confirmDelete" size="large">
@@ -214,23 +214,51 @@ function goChat() { router.push(`/groupchats/${gid}/chat`) }
 </script>
 
 <style scoped>
-.manage-page { min-height: 100vh; background: #f0f2f5; padding-bottom: 40px; }
-.top-bar { display: flex; align-items: center; padding: 16px 24px; background: white; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-.page-title { margin-left: 16px; font-size: 20px; font-weight: 600; }
+.manage-page { padding-bottom: 80px; }
 
-.content { max-width: 700px; margin: 24px auto; padding: 0 16px; }
+.top-bar { display: flex; align-items: center; gap: 14px; padding: 8px 0 32px; }
+.back-btn {
+  background: var(--ink-700) !important; border-color: var(--ink-500) !important; color: var(--star-soft) !important;
+}
+.back-btn:hover { border-color: var(--gold-dim) !important; color: var(--gold) !important; }
+.page-title {
+  font-family: var(--font-serif); font-size: var(--fs-xl); font-weight: 600;
+  color: var(--star); letter-spacing: 0.02em;
+}
 
-.section { background: white; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
-.section h3 { margin: 0 0 20px 0; font-size: 16px; font-weight: 600; padding-bottom: 12px; border-bottom: 1px solid #ebeef5; }
+.content { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
 
-.avatar-row { display: flex; align-items: center; gap: 16px; }
+.section {
+  background: var(--ink-700); border: 1px solid var(--ink-500);
+  border-radius: var(--radius); padding: 26px 28px; box-shadow: var(--shadow-card);
+}
+.section h3 {
+  margin: 0 0 22px; font-size: 16px; font-weight: 600;
+  font-family: var(--font-serif); color: var(--star);
+  padding-bottom: 14px; border-bottom: 1px solid var(--ink-500);
+}
+.count { color: var(--star-dim); font-size: 14px; font-family: var(--font-mono); }
 
-.member-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-.member-row { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 8px; background: #fafafa; }
-.member-name { flex: 1; font-size: 15px; font-weight: 500; }
+.avatar-row { display: flex; align-items: center; gap: 18px; }
+.g-avatar {
+  background: var(--ink-600); color: var(--cyan);
+  font-family: var(--font-serif); font-weight: 600; border-radius: 14px;
+  box-shadow: 0 0 0 1px var(--ink-500), 0 0 16px rgba(94, 179, 196, 0.15);
+}
+
+.member-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+.member-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  border-radius: var(--radius-sm); background: var(--ink-800);
+  border: 1px solid var(--ink-500);
+}
+.m-avatar { background: var(--ink-600); color: var(--gold); font-family: var(--font-serif); font-weight: 600; flex-shrink: 0; }
+.member-name { flex: 1; font-size: 15px; color: var(--star-soft); font-weight: 500; }
+.no-data { color: var(--star-dim); font-size: 14px; text-align: center; padding: 16px; }
 
 .add-member { display: flex; gap: 12px; align-items: center; }
+.opt-avatar { background: var(--ink-600); color: var(--gold); font-family: var(--font-serif); font-weight: 600; }
 
-.danger-section { border: 1px solid #fde2e2; }
-.danger-section h3 { color: #f56c6c; border-color: #fde2e2; }
+.danger-section { border-color: rgba(199, 107, 90, 0.4); }
+.danger-section h3 { color: var(--rust); border-color: rgba(199, 107, 90, 0.25); }
 </style>

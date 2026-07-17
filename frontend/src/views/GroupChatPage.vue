@@ -3,34 +3,38 @@
     <!-- 顶部导航栏 -->
     <div class="top-bar">
       <el-button :icon="ArrowLeft" circle class="back-btn" @click="goBack" />
-      <span class="gname">{{ group.name || '群聊' }}</span>
-
-      <el-button :icon="Setting" circle size="small" class="manage-btn" @click="goManage" title="群聊管理" />
-
-      <!-- 模式切换开关 -->
-      <div class="mode-toggle">
-        <span :class="{ active: chatMode === 'mention' }" @click="switchMode('mention')">
-          <el-icon><ChatDotRound /></el-icon> @提及
-        </span>
-        <span :class="{ active: chatMode === 'auto' }" @click="switchMode('auto')">
-          <el-icon><Connection /></el-icon> 自动
-        </span>
+      <div class="gname-wrap">
+        <span class="gname">{{ group.name || '群聊' }}</span>
+        <el-tag :type="statusTagType" size="small" effect="dark" class="status-tag">{{ statusText }}</el-tag>
       </div>
 
-      <el-tag :type="statusTagType" size="small">{{ statusText }}</el-tag>
+      <div class="top-right">
+        <div class="mode-toggle">
+          <span :class="{ active: chatMode === 'mention' }" @click="switchMode('mention')">
+            <el-icon><ChatDotRound /></el-icon> @提及
+          </span>
+          <span :class="{ active: chatMode === 'auto' }" @click="switchMode('auto')">
+            <el-icon><Connection /></el-icon> 自动
+          </span>
+        </div>
+        <el-button :icon="Setting" circle size="small" class="manage-btn" @click="goManage" title="群聊管理" />
+      </div>
     </div>
 
     <!-- 自动模式横幅 -->
     <div v-if="chatMode === 'auto'" class="auto-banner">
       <el-icon><InfoFilled /></el-icon>
-      自动对话模式 — 管理员智能体调度角色发言，你可随时插话或 @管理员 设置规则
+      <span>自动对话模式 · 管理员智能体调度角色发言，你可随时插话或 @管理员 设置规则</span>
     </div>
 
     <!-- 消息区域 -->
     <div class="messages" ref="mc">
-      <div v-if="loading" class="loading-msg">加载中...</div>
+      <div v-if="loading" class="loading-msg">
+        <span class="signal-pulse"></span> 正在接通信号…
+      </div>
       <div v-if="!loading && messages.length === 0" class="empty-msg">
-        发送第一条消息，开始群聊吧
+        <i class="empty-glyph">✦</i>
+        <p>发送第一条消息，开始群聊吧</p>
       </div>
 
       <template v-for="(m, i) in messages" :key="i">
@@ -40,23 +44,23 @@
         </div>
         <!-- 聊天气泡 -->
         <div v-else :class="['msg-row', m.role === 'user' ? 'msg-user' : 'msg-char']">
-          <el-avatar v-if="m.role === 'char'" :size="36" :src="getMemberAvatar(m.senderId)" class="msg-avatar">
+          <el-avatar v-if="m.role === 'char'" :size="38" :src="getMemberAvatar(m.senderId)" class="msg-avatar">
             {{ m.sender?.charAt(0) }}
           </el-avatar>
-          <div class="msg-bubble" :class="m.role">
+          <div class="msg-bubble tx-line" :class="m.role">
             <div v-if="m.role === 'char'" class="msg-sender">{{ m.sender }}</div>
             <div class="msg-text" v-html="renderContent(m.content)"></div>
             <div class="msg-time">{{ m.time }}</div>
           </div>
-          <el-avatar v-if="m.role === 'user'" :size="36" icon="UserFilled" class="msg-avatar" />
+          <el-avatar v-if="m.role === 'user'" :size="38" icon="UserFilled" class="msg-avatar user-av" />
         </div>
       </template>
 
       <!-- 等待回复 -->
       <div v-if="waiting" class="msg-row msg-char">
-        <el-avatar :size="36" icon="ChatDotRound" class="msg-avatar" />
-        <div class="msg-bubble char typing">
-          <span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>
+        <el-avatar :size="38" icon="ChatDotRound" class="msg-avatar typing-av" />
+        <div class="msg-bubble char tx-line typing">
+          <span class="typing-dots"><span></span><span></span><span></span></span>
         </div>
       </div>
     </div>
@@ -71,9 +75,9 @@
           </div>
           <div v-if="filteredMembers.length === 0" class="mention-empty">无匹配成员</div>
         </div>
-        <el-input ref="inputRef" v-model="text" placeholder="输入消息，@成员名可提及角色..." @keyup.enter="send" @input="onInput" :disabled="waiting" size="large" />
+        <el-input ref="inputRef" v-model="text" placeholder="输入消息，@成员名可提及角色…" @keyup.enter="send" @input="onInput" :disabled="waiting" size="large" />
       </div>
-      <el-button type="primary" :icon="Promotion" size="large" @click="send" :disabled="waiting || !text.trim()" />
+      <el-button type="primary" :icon="Promotion" size="large" @click="send" :disabled="waiting || !text.trim()" class="send-btn" />
     </div>
   </div>
 </template>
@@ -258,7 +262,7 @@ async function runAutoStep() {
         stopAutoLoop()
         resetIdleTimer()
       } else {
-        // pause or other — stop completely
+        // pause or other - stop completely
         if (d.reason) {
           messages.value.push({ role: 'system', content: '[对话暂停] ' + d.reason, time: nowTime() })
         }
@@ -440,73 +444,216 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.group-chat { height: 100vh; display: flex; flex-direction: column; background: #ededed; }
+.group-chat {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, rgba(26, 37, 64, 0.88), rgba(20, 29, 51, 0.94));
+}
 
-/* Top bar */
-.top-bar { display: flex; align-items: center; padding: 10px 16px; background: white; box-shadow: 0 1px 4px rgba(0,0,0,0.06); flex-shrink: 0; gap: 10px; }
-.gname { flex: 1; font-size: 17px; font-weight: 600; }
-.back-btn { border: none; background: #f5f5f5; }
-.manage-btn { border: none; background: #f5f5f5; margin-right: 4px; }
+/* ---------- Top bar ---------- */
+.top-bar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 20px;
+  background: rgba(11, 16, 30, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--ink-500);
+  flex-shrink: 0;
+}
+.back-btn {
+  flex: none;
+  background: var(--ink-700) !important;
+  border-color: var(--ink-500) !important;
+  color: var(--star-soft) !important;
+}
+.back-btn:hover { border-color: var(--gold-dim) !important; color: var(--gold) !important; }
 
-/* Mode toggle */
-.mode-toggle { display: flex; background: #f0f0f0; border-radius: 20px; padding: 2px; margin-right: 4px; }
+.gname-wrap { flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0; }
+.gname {
+  font-family: var(--font-serif);
+  font-size: 17px; font-weight: 600;
+  color: var(--star);
+  letter-spacing: 0.02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.status-tag { flex: none; }
+
+.top-right { display: flex; align-items: center; gap: 10px; flex: none; }
+.manage-btn {
+  background: var(--ink-700) !important;
+  border-color: var(--ink-500) !important;
+  color: var(--star-soft) !important;
+}
+.manage-btn:hover { border-color: var(--gold-dim) !important; color: var(--gold) !important; }
+
+.mode-toggle {
+  display: flex;
+  background: var(--ink-800);
+  border: 1px solid var(--ink-500);
+  border-radius: 20px;
+  padding: 3px;
+}
 .mode-toggle span {
-  display: flex; align-items: center; gap: 4px; padding: 4px 14px;
-  border-radius: 18px; cursor: pointer; font-size: 13px; color: #909399; transition: all 0.2s;
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 14px;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--star-dim);
+  transition: all 0.2s ease;
+  user-select: none;
 }
-.mode-toggle span.active { background: white; color: #303133; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.mode-toggle span:hover { color: var(--star-soft); }
+.mode-toggle span.active {
+  background: linear-gradient(135deg, var(--gold), var(--gold-bright));
+  color: #1a1408;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(230, 181, 102, 0.3);
+}
 
-/* Auto banner */
+/* ---------- Auto banner ---------- */
 .auto-banner {
-  display: flex; align-items: center; gap: 8px; padding: 8px 16px;
-  background: #e6f7ff; color: #1890ff; font-size: 13px; border-bottom: 1px solid #91d5ff;
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 20px;
+  background: linear-gradient(90deg, rgba(94, 179, 196, 0.12), rgba(230, 181, 102, 0.08));
+  border-bottom: 1px solid rgba(94, 179, 196, 0.25);
+  color: var(--cyan);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.auto-banner .el-icon { color: var(--cyan); flex: none; }
+
+/* ---------- Messages ---------- */
+.messages { flex: 1; overflow-y: auto; padding: 24px 20px 8px; }
+.loading-msg {
+  text-align: center; color: var(--star-dim);
+  padding: 80px 0; font-size: 14px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  font-family: var(--font-mono); letter-spacing: 0.05em;
+}
+.signal-pulse {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--gold);
+  animation: pulse 1.6s ease-out infinite;
+}
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(230, 181, 102, 0.6); }
+  70% { box-shadow: 0 0 0 12px rgba(230, 181, 102, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(230, 181, 102, 0); }
 }
 
-/* Messages container */
-.messages { flex: 1; overflow-y: auto; padding: 16px; }
-.loading-msg, .empty-msg { text-align: center; color: #909399; padding: 60px 0; font-size: 15px; }
+.empty-msg { text-align: center; color: var(--star-dim); padding: 90px 24px; font-size: 15px; }
+.empty-glyph { display: block; font-size: 34px; color: var(--gold); opacity: 0.5; margin-bottom: 16px; font-style: normal; }
+.empty-msg p { line-height: 1.7; }
 
 /* System messages */
-.system-msg { text-align: center; padding: 8px 0; }
-.system-text { font-size: 12px; color: #909399; background: #f5f5f5; padding: 2px 12px; border-radius: 10px; }
+.system-msg { text-align: center; padding: 10px 0; }
+.system-text {
+  display: inline-block;
+  font-size: 12px; color: var(--star-dim);
+  background: var(--ink-700);
+  border: 1px solid var(--ink-500);
+  padding: 4px 14px; border-radius: 14px;
+  font-family: var(--font-mono); letter-spacing: 0.03em;
+}
 
 /* Chat bubbles */
 .msg-row { display: flex; margin-bottom: 18px; align-items: flex-start; }
 .msg-user { flex-direction: row-reverse; }
 .msg-char { flex-direction: row; }
-.msg-avatar { flex-shrink: 0; margin: 0 10px; }
-.msg-bubble { max-width: 70%; padding: 10px 14px; border-radius: 8px; position: relative; }
-.msg-bubble.user { background: #95ec69; border-top-right-radius: 2px; }
-.msg-bubble.char { background: white; border-top-left-radius: 2px; }
-.msg-sender { font-size: 12px; color: #409eff; font-weight: 600; margin-bottom: 2px; }
-.msg-text { font-size: 15px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
-.msg-text :deep(.mention) { color: #409eff; font-weight: 600; }
-.msg-time { font-size: 11px; color: #999; margin-top: 4px; text-align: right; }
+.msg-avatar {
+  flex-shrink: 0; margin: 0 12px;
+  background: var(--ink-600); color: var(--gold);
+  font-family: var(--font-serif); font-weight: 600;
+  box-shadow: 0 0 0 1px var(--ink-500), 0 0 14px rgba(230, 181, 102, 0.15);
+}
+.msg-avatar.user-av { color: var(--star); background: var(--ink-500); box-shadow: 0 0 0 1px var(--ink-500); }
+.msg-avatar.typing-av { color: var(--cyan); }
 
-/* Typing indicator */
-.msg-bubble.typing { padding: 12px 20px; }
-.typing-dots span { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #ccc; margin: 0 2px; animation: blink 1.4s infinite; }
+.msg-bubble {
+  max-width: 70%;
+  padding: 10px 16px 8px 18px;
+  border-radius: 14px;
+  position: relative;
+  word-break: break-word;
+}
+.msg-bubble.user {
+  background: linear-gradient(135deg, rgba(230, 181, 102, 0.16), rgba(230, 181, 102, 0.08));
+  border: 1px solid rgba(230, 181, 102, 0.35);
+  border-top-right-radius: 4px;
+  color: var(--star);
+}
+.msg-bubble.char {
+  background: var(--ink-700);
+  border: 1px solid var(--ink-500);
+  border-top-left-radius: 4px;
+  color: var(--star);
+}
+.msg-bubble.char.tx-line::before { left: 8px; background: linear-gradient(to bottom, transparent, var(--cyan), transparent); opacity: 0.6; }
+.msg-bubble.user.tx-line::before { left: auto; right: 8px; background: linear-gradient(to bottom, transparent, var(--gold), transparent); opacity: 0.7; }
+.msg-sender {
+  font-size: 12px; color: var(--gold);
+  font-weight: 600; margin-bottom: 3px;
+  letter-spacing: 0.04em;
+}
+.msg-text { font-size: 15px; line-height: 1.6; white-space: pre-wrap; }
+.msg-text :deep(.mention) { color: var(--gold); font-weight: 600; }
+.msg-time {
+  font-size: 10px; color: var(--star-faint);
+  margin-top: 5px; text-align: right;
+  font-family: var(--font-mono); letter-spacing: 0.04em;
+}
+
+.msg-bubble.typing { padding: 14px 20px; }
+.typing-dots { display: inline-flex; gap: 5px; align-items: center; }
+.typing-dots span {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--gold); opacity: 0.3;
+  animation: blink 1.4s infinite;
+}
 .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
 .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
-@keyframes blink { 0%,60%,100% { opacity: 0.2; } 30% { opacity: 1; } }
+@keyframes blink { 0%, 60%, 100% { opacity: 0.25; transform: scale(0.85); } 30% { opacity: 1; transform: scale(1); } }
 
-/* Input bar */
-.input-bar { display: flex; padding: 10px 16px; background: white; gap: 10px; border-top: 1px solid #e0e0e0; flex-shrink: 0; }
-.input-bar .el-button { flex-shrink: 0; }
+/* ---------- Input bar ---------- */
+.input-bar {
+  display: flex; padding: 14px 20px; gap: 12px;
+  background: rgba(11, 16, 30, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--ink-500);
+  flex-shrink: 0;
+}
+.send-btn { flex: none; }
 .input-wrapper { flex: 1; position: relative; }
 
 /* @mention dropdown */
 .mention-list {
-  position: absolute; bottom: 100%; left: 0; right: 0; margin-bottom: 4px;
-  background: white; border: 1px solid #e4e7ed; border-radius: 8px;
-  box-shadow: 0 -2px 12px rgba(0,0,0,0.1); max-height: 200px; overflow-y: auto; z-index: 100;
+  position: absolute; bottom: 100%; left: 0; right: 0; margin-bottom: 6px;
+  background: var(--ink-700);
+  border: 1px solid var(--ink-500);
+  border-radius: 12px;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4);
+  max-height: 220px; overflow-y: auto; z-index: 100;
+  padding: 4px;
 }
 .mention-item {
-  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
-  cursor: pointer; transition: background 0.15s;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s;
+  color: var(--star-soft);
 }
-.mention-item:hover { background: #f5f7fa; }
-.mention-item:first-child { border-radius: 8px 8px 0 0; }
-.mention-item:last-child { border-radius: 0 0 8px 8px; }
-.mention-empty { padding: 12px; text-align: center; color: #909399; font-size: 13px; }
+.mention-item:hover { background: var(--ink-500); color: var(--gold); }
+.mention-empty { padding: 12px; text-align: center; color: var(--star-dim); font-size: 13px; }
+
+@media (max-width: 640px) {
+  .top-bar { padding: 10px 12px; gap: 10px; }
+  .gname { font-size: 15px; }
+  .mode-toggle span { padding: 5px 10px; font-size: 12px; }
+  .msg-bubble { max-width: 82%; }
+  .auto-banner { font-size: 12px; padding: 8px 14px; }
+}
 </style>

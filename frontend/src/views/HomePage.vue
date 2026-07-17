@@ -1,45 +1,45 @@
 <template>
   <div class="home-page">
-    <!-- 右上角设置按钮 -->
-    <div class="settings-btn" @click="goSettings" title="设置">
-      <el-icon :size="28"><Setting /></el-icon>
-    </div>
+    <button class="settings-btn" @click="goSettings" title="设置" aria-label="设置">
+      <el-icon :size="20"><Setting /></el-icon>
+    </button>
 
-    <!-- 中央区域 -->
     <div class="home-center">
-      <h1 class="app-title">ChronoChat</h1>
-      <p class="app-subtitle">时空对话</p>
+      <div class="brand">
+        <i class="brand-glyph">✦</i>
+        <h1 class="app-title">ChronoChat</h1>
+        <p class="app-subtitle">时空对话</p>
+      </div>
 
       <div class="entry-buttons">
-        <!-- 角色列表入口 -->
         <div class="entry-card" @click="goCharacterList">
-          <div class="entry-icon character-icon">
-            <el-icon :size="64"><UserFilled /></el-icon>
+          <div class="entry-orb character">
+            <span class="orb-ring"></span>
+            <el-icon :size="38"><UserFilled /></el-icon>
           </div>
           <span class="entry-label">角色列表</span>
           <span class="entry-desc">与你的时空旅人对话</span>
         </div>
 
-        <!-- 群聊列表入口 -->
         <div class="entry-card" @click="goGroupChatList">
-          <div class="entry-icon group-icon">
-            <el-icon :size="64"><ChatDotRound /></el-icon>
+          <div class="entry-orb group">
+            <span class="orb-ring"></span>
+            <el-icon :size="38"><ChatDotRound /></el-icon>
           </div>
           <span class="entry-label">群聊列表</span>
           <span class="entry-desc">时空茶话会</span>
         </div>
       </div>
 
-      <!-- 后端连接状态 -->
       <div class="status-bar">
         <span v-if="backendOnline" class="status online">
-          <el-icon><CircleCheck /></el-icon> 后端服务已连接
+          <span class="signal-dot"></span> 后端服务已连接
         </span>
         <span v-else-if="checking" class="status checking">
-          <el-icon><Loading /></el-icon> 正在检测后端连接...
+          <span class="signal-dot"></span> 正在检测后端连接…
         </span>
         <span v-else class="status offline">
-          <el-icon><WarningFilled /></el-icon> 后端服务未连接
+          <span class="signal-dot"></span> 后端服务未连接
         </span>
       </div>
     </div>
@@ -91,128 +91,165 @@ function goGroupChatList() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   position: relative;
+  background: transparent;
+  padding: 40px 24px;
 }
 
 .settings-btn {
   position: absolute;
-  top: 24px;
+  top: 26px;
   right: 32px;
-  width: 48px;
-  height: 48px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: white;
-  transition: all 0.3s;
+  border: 1px solid var(--ink-500);
+  background: rgba(19, 26, 46, 0.6);
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--star-dim);
+  transition: all 0.35s ease;
 }
 .settings-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: rotate(30deg);
+  color: var(--gold);
+  border-color: var(--gold-dim);
+  transform: rotate(45deg);
+  box-shadow: 0 0 18px rgba(230, 181, 102, 0.25);
 }
 
-.home-center {
-  text-align: center;
-}
+.home-center { text-align: center; max-width: 720px; }
 
+.brand { margin-bottom: 64px; }
+.brand-glyph {
+  display: block;
+  font-size: 30px;
+  color: var(--gold);
+  opacity: 0.7;
+  margin-bottom: 14px;
+  font-style: normal;
+  text-shadow: 0 0 24px rgba(230, 181, 102, 0.5);
+}
 .app-title {
-  font-size: 48px;
+  font-family: var(--font-serif);
+  font-size: 64px;
   font-weight: 700;
-  color: white;
-  margin: 0 0 4px 0;
-  letter-spacing: 4px;
-  text-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  margin: 0 0 6px;
+  letter-spacing: 0.04em;
+  background: linear-gradient(135deg, var(--star) 30%, var(--gold) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-
 .app-subtitle {
-  font-size: 18px;
-  color: rgba(255,255,255,0.75);
-  margin: 0 0 48px 0;
-  letter-spacing: 8px;
+  font-size: 16px;
+  color: var(--star-dim);
+  margin: 0;
+  letter-spacing: 0.6em;
+  padding-left: 0.6em;
 }
 
 .entry-buttons {
   display: flex;
-  gap: 40px;
+  gap: 56px;
   justify-content: center;
+  margin-bottom: 56px;
 }
 
 .entry-card {
-  width: 200px;
-  height: 200px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(15px);
-  border: 1px solid rgba(255,255,255,0.2);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  gap: 14px;
   cursor: pointer;
-  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  gap: 12px;
+  padding: 12px;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.entry-card:hover {
-  transform: translateY(-8px);
-  background: rgba(255, 255, 255, 0.22);
-  box-shadow: 0 16px 40px rgba(0,0,0,0.2);
-}
+.entry-card:hover { transform: translateY(-6px); }
 
-.entry-icon {
-  width: 80px;
-  height: 80px;
+.entry-orb {
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
+  position: relative;
+  color: #1a1408;
+  transition: box-shadow 0.4s ease;
 }
-.character-icon {
-  background: linear-gradient(135deg, #43e97b, #38f9d7);
-  color: white;
+.entry-orb.character {
+  background: radial-gradient(circle at 35% 30%, var(--gold-bright), var(--gold) 55%, var(--gold-dim) 100%);
+  box-shadow: 0 0 0 1px rgba(230, 181, 102, 0.4), 0 0 40px rgba(230, 181, 102, 0.35);
 }
-.group-icon {
-  background: linear-gradient(135deg, #fa709a, #fee140);
-  color: white;
+.entry-orb.group {
+  background: radial-gradient(circle at 35% 30%, #7fcad9, var(--cyan) 55%, var(--cyan-dim) 100%);
+  box-shadow: 0 0 0 1px rgba(94, 179, 196, 0.4), 0 0 40px rgba(94, 179, 196, 0.3);
+  color: #06222a;
 }
+.entry-card:hover .entry-orb.character { box-shadow: 0 0 0 1px var(--gold), 0 0 60px rgba(230, 181, 102, 0.55); }
+.entry-card:hover .entry-orb.group { box-shadow: 0 0 0 1px var(--cyan), 0 0 60px rgba(94, 179, 196, 0.5); }
+
+.orb-ring {
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  border: 1px solid rgba(230, 181, 102, 0.25);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.entry-orb.group .orb-ring { border-color: rgba(94, 179, 196, 0.25); }
+.entry-card:hover .orb-ring { opacity: 1; }
 
 .entry-label {
+  font-family: var(--font-serif);
   font-size: 20px;
   font-weight: 600;
-  color: white;
+  color: var(--star);
+  letter-spacing: 0.04em;
 }
-
 .entry-desc {
   font-size: 13px;
-  color: rgba(255,255,255,0.65);
+  color: var(--star-dim);
+  letter-spacing: 0.02em;
 }
 
-.status-bar {
-  margin-top: 48px;
-}
-
+.status-bar { display: flex; justify-content: center; }
 .status {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 9px;
   font-size: 13px;
-  padding: 6px 16px;
+  padding: 7px 18px;
   border-radius: 20px;
+  border: 1px solid var(--ink-500);
+  background: rgba(19, 26, 46, 0.5);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
 }
-.status.online {
-  color: #67c23a;
-  background: rgba(103,194,58,0.15);
+.signal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }
-.status.offline {
-  color: #f56c6c;
-  background: rgba(245,108,108,0.15);
+.status.online { color: var(--cyan); }
+.status.online .signal-dot { background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+.status.checking { color: var(--gold); }
+.status.checking .signal-dot { background: var(--gold); box-shadow: 0 0 10px var(--gold); animation: pulse 1.6s ease-out infinite; }
+.status.offline { color: var(--rust); }
+.status.offline .signal-dot { background: var(--rust); }
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(230, 181, 102, 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(230, 181, 102, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(230, 181, 102, 0); }
 }
-.status.checking {
-  color: #e6a23c;
-  background: rgba(230,162,60,0.15);
+
+@media (max-width: 600px) {
+  .app-title { font-size: 44px; }
+  .entry-buttons { gap: 28px; }
+  .entry-orb { width: 88px; height: 88px; }
+  .brand { margin-bottom: 44px; }
 }
 </style>

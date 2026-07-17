@@ -1,10 +1,23 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="dark">
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ChronoChat - 时空对话</title>
+
+  <!-- 字体：思源宋体(标题) + 思源黑体(正文) + JetBrains Mono(读数)；离线降级到系统字体 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- 防止加载白闪：在样式表就绪前先把底色设为深空墨蓝 -->
+  <style>
+    html, body { margin: 0; padding: 0; background-color: #141d33; }
+  </style>
 </head>
 <body>
   <div id="app"></div>

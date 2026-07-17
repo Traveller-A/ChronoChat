@@ -1,27 +1,29 @@
 <template>
-  <div class="page">
+  <div class="page create-page">
     <div class="top-bar">
       <el-button :icon="ArrowLeft" circle class="back-btn" @click="goBack" />
       <span class="page-title">创建群聊</span>
     </div>
-    <div class="form">
+
+    <div class="form-card">
       <el-form label-position="top" size="large">
         <el-form-item label="群聊名称" required>
           <el-input v-model="name" placeholder="给群聊起个名字" />
         </el-form-item>
-        <el-form-item label="选择成员（至少2位）">
+        <el-form-item label="选择成员（至少 2 位）">
           <div class="members">
             <div v-for="c in allChars" :key="c.id" class="member"
-              :class="{sel:selected.includes(c.id)}" @click="toggle(c.id)">
-              <el-avatar :size="36" :src="getAvatarUrl(c.id)">{{ c.name.charAt(0) }}</el-avatar>
-              <span>{{ c.name }}</span>
-              <el-icon v-if="selected.includes(c.id)" color="#67c23a"><Check /></el-icon>
+              :class="{ sel: selected.includes(c.id) }" @click="toggle(c.id)">
+              <el-avatar :size="38" :src="getAvatarUrl(c.id)" class="m-avatar">{{ c.name.charAt(0) }}</el-avatar>
+              <span class="m-name">{{ c.name }}</span>
+              <el-icon v-if="selected.includes(c.id)" class="m-check"><Check /></el-icon>
             </div>
+            <div v-if="allChars.length === 0" class="no-chars">还没有可选角色，请先创建角色</div>
           </div>
         </el-form-item>
         <div class="bottom">
           <el-button @click="goBack">返回</el-button>
-          <el-button type="primary" @click="doCreate" :disabled="selected.length<2||!name">创建群聊</el-button>
+          <el-button type="primary" @click="doCreate" :disabled="selected.length < 2 || !name">创建群聊</el-button>
         </div>
       </el-form>
     </div>
@@ -33,7 +35,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Check } from '@element-plus/icons-vue'
 import { listCharacters, getAvatarUrl, createGroup } from '@/api'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 const name = ref('')
@@ -56,19 +58,53 @@ async function doCreate() {
 }
 function goBack(){
   if(name.value || selected.value.length) {
-    ElMessage.confirm('确定放弃创建吗？','提示',{type:'warning'}).then(()=>router.push('/groupchats'))
+    ElMessageBox.confirm('确定放弃创建吗？','提示',{type:'warning'}).then(()=>router.push('/groupchats')).catch(()=>{})
   } else router.push('/groupchats')
 }
 </script>
 
 <style scoped>
-.page{min-height:100vh;background:#f0f2f5}
-.top-bar{display:flex;align-items:center;padding:16px 24px;background:white}
-.back-btn{border:none;background:#f5f5f5}
-.page-title{margin-left:16px;font-size:20px;font-weight:600}
-.form{max-width:600px;margin:24px auto;padding:24px;background:white;border-radius:12px}
-.members{display:flex;flex-wrap:wrap;gap:8px}
-.member{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer}
-.member.sel{border-color:#67c23a;background:#f0f9eb}
-.bottom{display:flex;justify-content:center;gap:16px;margin-top:24px;padding-top:16px;border-top:1px solid #ebeef5}
+.create-page { padding-bottom: 80px; }
+
+.top-bar { display: flex; align-items: center; gap: 14px; padding: 8px 0 32px; }
+.back-btn {
+  background: var(--ink-700) !important; border-color: var(--ink-500) !important; color: var(--star-soft) !important;
+}
+.back-btn:hover { border-color: var(--gold-dim) !important; color: var(--gold) !important; }
+.page-title {
+  font-family: var(--font-serif); font-size: var(--fs-xl); font-weight: 600;
+  color: var(--star); letter-spacing: 0.02em;
+}
+
+.form-card {
+  max-width: 640px; margin: 0 auto; padding: 30px 32px;
+  background: var(--ink-700); border: 1px solid var(--ink-500);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+}
+
+.members { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; }
+.member {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px 8px 8px;
+  border: 1px solid var(--ink-500); border-radius: 999px;
+  background: var(--ink-800); cursor: pointer;
+  transition: all 0.2s ease;
+}
+.member:hover { border-color: var(--gold-dim); }
+.member.sel {
+  border-color: var(--gold);
+  background: rgba(230, 181, 102, 0.1);
+  box-shadow: 0 0 0 1px var(--gold), 0 0 16px rgba(230, 181, 102, 0.2);
+}
+.m-avatar { background: var(--ink-600); color: var(--gold); font-family: var(--font-serif); font-weight: 600; flex-shrink: 0; }
+.member.sel .m-avatar { box-shadow: 0 0 0 1px var(--gold); }
+.m-name { font-size: 14px; color: var(--star-soft); }
+.member.sel .m-name { color: var(--star); }
+.m-check { color: var(--gold); font-size: 16px; }
+.no-chars { width: 100%; text-align: center; color: var(--star-dim); font-size: 14px; padding: 24px; }
+
+.bottom {
+  display: flex; justify-content: center; gap: 16px;
+  margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--ink-500);
+}
 </style>

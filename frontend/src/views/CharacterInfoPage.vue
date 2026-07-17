@@ -1,6 +1,5 @@
 <template>
-  <div class="info-page" v-loading="loading">
-    <!-- 顶部导航栏 -->
+  <div class="page info-page" v-loading="loading">
     <div class="top-bar">
       <el-button :icon="ArrowLeft" circle class="back-btn" @click="goBack" />
       <span class="page-title">{{ char.name }}</span>
@@ -8,18 +7,18 @@
     </div>
 
     <div class="info-content" v-if="!loading">
-      <!-- ====== 只读信息区 ====== -->
+      <!-- 只读信息区 -->
       <div class="info-card">
         <div class="profile-top">
-          <el-avatar :size="80" :src="getAvatarUrl(charId)" shape="square" class="big-avatar">
+          <el-avatar :size="84" :src="getAvatarUrl(charId)" shape="square" class="big-avatar">
             {{ char.name?.charAt(0) }}
           </el-avatar>
           <div class="profile-detail">
             <h2>{{ char.name }}</h2>
             <div class="tags">
-              <el-tag v-if="char.gender">{{ char.gender === 'Male' ? '男' : char.gender === 'Female' ? '女' : char.gender }}</el-tag>
-              <el-tag v-if="char.age" type="info">{{ char.age }}岁</el-tag>
-              <el-tag v-if="char.birthday" type="warning">{{ char.birthday }}</el-tag>
+              <el-tag v-if="char.gender" effect="dark">{{ char.gender === 'Male' ? '男' : char.gender === 'Female' ? '女' : char.gender }}</el-tag>
+              <el-tag v-if="char.age" type="info" effect="dark">{{ char.age }}岁</el-tag>
+              <el-tag v-if="char.birthday" type="warning" effect="dark">{{ char.birthday }}</el-tag>
             </div>
             <p class="signature">{{ char.personality_signature || '还没有个性签名' }}</p>
           </div>
@@ -51,7 +50,7 @@
         </div>
       </div>
 
-      <!-- ====== 可变信息区 ====== -->
+      <!-- 核心记忆 -->
       <div class="info-card">
         <div class="section-header"><h3>核心记忆</h3></div>
         <div v-if="memoryFragments.length" class="memory-timeline">
@@ -68,7 +67,7 @@
         <p class="user-desc">{{ char.user_description }}</p>
       </div>
 
-      <!-- ====== 底部操作栏 ====== -->
+      <!-- 底部操作栏 -->
       <div class="bottom-actions">
         <el-button @click="doExport" :loading="exporting">导出</el-button>
         <el-button @click="doDuplicate" :loading="duplicating">存为副本</el-button>
@@ -176,41 +175,67 @@ function goEdit() { router.push(`/characters/${charId}/edit`) }
 </script>
 
 <style scoped>
-.info-page { min-height: 100vh; background: #f0f2f5; }
-.top-bar { display: flex; align-items: center; padding: 12px 20px; background: white; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-.back-btn { border: none; background: #f5f5f5; }
-.page-title { flex: 1; margin: 0 14px; font-size: 19px; font-weight: 600; }
-.edit-btn { border: none; background: #f5f5f5; }
+.info-page { padding-bottom: 80px; }
 
-.info-content { max-width: 700px; margin: 20px auto; padding: 0 16px; }
-.info-card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.04); }
+.top-bar { display: flex; align-items: center; gap: 14px; padding: 8px 0 32px; }
+.back-btn, .edit-btn {
+  background: var(--ink-700) !important; border-color: var(--ink-500) !important; color: var(--star-soft) !important;
+}
+.back-btn:hover, .edit-btn:hover { border-color: var(--gold-dim) !important; color: var(--gold) !important; }
+.page-title {
+  flex: 1; font-family: var(--font-serif); font-size: var(--fs-xl); font-weight: 600;
+  color: var(--star); letter-spacing: 0.02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
-.profile-top { display: flex; gap: 20px; align-items: center; }
-.big-avatar { flex-shrink: 0; }
-.profile-detail h2 { margin: 0 0 8px; font-size: 22px; }
-.tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
-.signature { color: #606266; font-size: 14px; }
+.info-content { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.info-card {
+  background: var(--ink-700); border: 1px solid var(--ink-500);
+  border-radius: var(--radius); padding: 26px 28px; box-shadow: var(--shadow-card);
+}
 
-.section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.section-header h3 { margin: 0; font-size: 16px; }
-.update-time { font-size: 12px; color: #909399; flex: 1; }
+.profile-top { display: flex; gap: 22px; align-items: center; }
+.big-avatar {
+  flex-shrink: 0; background: var(--ink-600); color: var(--gold);
+  font-family: var(--font-serif); font-weight: 600; border-radius: 14px;
+  box-shadow: 0 0 0 1px var(--ink-500), 0 0 24px rgba(230, 181, 102, 0.2);
+}
+.profile-detail h2 { margin: 0 0 10px; font-size: 24px; color: var(--star); }
+.tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.signature { color: var(--star-dim); font-size: 14px; }
 
-.personality-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid #ebeef5; }
-.mbti-badge { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-.mbti-label { font-size: 13px; color: #909399; }
-.mbti-value { font-size: 28px; font-weight: 700; color: #409eff; letter-spacing: 2px; }
-.trait-list { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-.breakdown { font-size: 13px; color: #606266; line-height: 1.6; margin-bottom: 8px; }
-.speaking { font-size: 13px; color: #606266; }
-.no-analysis, .no-data { color: #909399; font-size: 14px; text-align: center; padding: 20px; }
+.section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.section-header h3 { margin: 0; font-size: 16px; font-family: var(--font-serif); color: var(--star); }
+.update-time { font-size: 12px; color: var(--star-faint); flex: 1; font-family: var(--font-mono); }
 
-.memory-timeline { position: relative; padding-left: 20px; }
-.memory-timeline::before { content: ''; position: absolute; left: 6px; top: 0; bottom: 0; width: 2px; background: #e0e0e0; }
-.memory-item { position: relative; margin-bottom: 14px; padding-left: 10px; }
-.memory-dot { position: absolute; left: -18px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: #409eff; }
-.memory-text { font-size: 14px; color: #303133; line-height: 1.5; }
+.personality-section { margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--ink-500); }
+.mbti-badge { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+.mbti-label { font-size: 12px; color: var(--star-dim); font-family: var(--font-mono); letter-spacing: 0.1em; }
+.mbti-value { font-size: 32px; font-weight: 700; color: var(--gold); letter-spacing: 3px; font-family: var(--font-mono); }
+.trait-list { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.breakdown { font-size: 13px; color: var(--star-soft); line-height: 1.7; margin-bottom: 8px; }
+.speaking { font-size: 13px; color: var(--star-soft); line-height: 1.7; }
+.speaking strong { color: var(--gold); }
+.no-analysis, .no-data { color: var(--star-dim); font-size: 14px; text-align: center; padding: 24px; }
 
-.user-desc { font-size: 14px; color: #606266; line-height: 1.8; white-space: pre-wrap; }
+.memory-timeline { position: relative; padding-left: 22px; }
+.memory-timeline::before {
+  content: ''; position: absolute; left: 5px; top: 4px; bottom: 4px; width: 1px;
+  background: linear-gradient(to bottom, var(--gold-dim), var(--ink-500));
+}
+.memory-item { position: relative; margin-bottom: 16px; padding-left: 12px; }
+.memory-dot {
+  position: absolute; left: -21px; top: 6px; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--gold); box-shadow: 0 0 0 2px var(--ink-700), 0 0 10px rgba(230, 181, 102, 0.6);
+}
+.memory-text { font-size: 14px; color: var(--star-soft); line-height: 1.6; }
 
-.bottom-actions { display: flex; justify-content: center; gap: 16px; padding: 8px 0 40px; }
+.user-desc { font-size: 14px; color: var(--star-soft); line-height: 1.9; white-space: pre-wrap; }
+
+.bottom-actions { display: flex; justify-content: center; gap: 16px; padding: 12px 0 0; }
+
+@media (max-width: 600px) {
+  .profile-top { flex-direction: column; gap: 14px; text-align: center; align-items: center; }
+  .tags, .signature { justify-content: center; }
+}
 </style>
