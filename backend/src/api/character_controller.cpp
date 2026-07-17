@@ -615,6 +615,8 @@ void CharacterController::chat(
 
     // Update last active date
     svc.updateLastActiveDate(id, today);
+    // Bump last chat timestamp so this character floats to the top of the list
+    svc.touchLastChatAt(id);
 
     // Determine log file based on mode
     std::string logFile = (mode == "letter") ? "LETTER_LOG.md" : "CHAT_LOG.md";

@@ -7,6 +7,7 @@
 #include <iostream>
 #include <random>
 #include <algorithm>
+#include <sys/stat.h>
 
 namespace fs = std::filesystem;
 
@@ -26,6 +27,13 @@ static int64_t nowMs() {
 static const char* colText(sqlite3_stmt* stmt, int col, const char* d = "") {
     const unsigned char* t = sqlite3_column_text(stmt, col);
     return t ? reinterpret_cast<const char*>(t) : d;
+}
+
+// File modification time as Unix epoch milliseconds; 0 if missing/unreadable.
+static int64_t fileMtimeToEpochMs(const std::string& path) {
+    struct _stat st;
+    if (_stat(path.c_str(), &st) != 0) return 0;
+    return static_cast<int64_t>(st.st_mtime) * 1000;
 }
 
 GroupService& GroupService::instance() { static GroupService s; return s; }
@@ -68,15 +76,51 @@ bool GroupService::ensureTables() {
     };
     addCol("description", "TEXT DEFAULT ''");
     addCol("mode", "TEXT DEFAULT 'mention'");
+    addCol("last_chat_at", "INTEGER DEFAULT 0");
+
+    backfillLastChatAt();
 
     return true;
+}
+
+// For every group that still has last_chat_at = 0, derive a timestamp from its
+// chat.log file so the list reflects past activity. Called once at startup.
+void GroupService::backfillLastChatAt() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!db_) return;
+
+    sqlite3_stmt* sel = nullptr;
+    if (sqlite3_prepare_v2(db_, "SELECT id FROM groups WHERE last_chat_at = 0;",
+                           -1, &sel, nullptr) != SQLITE_OK) return;
+    std::vector<std::string> ids;
+    while (sqlite3_step(sel) == SQLITE_ROW) {
+        ids.emplace_back(colText(sel, 0));
+    }
+    sqlite3_finalize(sel);
+
+    if (ids.empty()) return;
+
+    sqlite3_stmt* upd = nullptr;
+    if (sqlite3_prepare_v2(db_, "UPDATE groups SET last_chat_at = ? WHERE id = ?;",
+                           -1, &upd, nullptr) != SQLITE_OK) return;
+    for (const auto& id : ids) {
+        int64_t latest = fileMtimeToEpochMs(dataDir_ + "/groups/" + id + "/chat.log");
+        if (latest <= 0) continue;  // no chat history on disk -> leave at 0
+
+        sqlite3_bind_int64(upd, 1, latest);
+        sqlite3_bind_text(upd, 2, id.c_str(), -1, SQLITE_STATIC);
+        sqlite3_step(upd);
+        sqlite3_reset(upd);
+        sqlite3_clear_bindings(upd);
+    }
+    sqlite3_finalize(upd);
 }
 
 std::vector<GroupInfo> GroupService::listGroups() const {
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<GroupInfo> result;
     if (!db_) return result;
-    const char* sql = "SELECT id,name,description,avatar_path,mode,status,members_json,created_at,updated_at FROM groups ORDER BY updated_at DESC;";
+    const char* sql = "SELECT id,name,description,avatar_path,mode,status,members_json,created_at,updated_at FROM groups ORDER BY last_chat_at DESC, created_at DESC;";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return result;
     while (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -240,6 +284,20 @@ void GroupService::appendChatLog(const std::string& groupId, const std::string& 
     std::string path = dataDir_ + "/groups/" + groupId + "/chat.log";
     std::ofstream out(path, std::ios::app);
     out << entry << "\n";
+    // Bump last chat timestamp so this group floats to the top of the list
+    touchLastChatAt(groupId);
+}
+
+void GroupService::touchLastChatAt(const std::string& groupId) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!db_) return;
+    const char* sql = "UPDATE groups SET last_chat_at = ? WHERE id = ?;";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return;
+    sqlite3_bind_int64(stmt, 1, nowMs());
+    sqlite3_bind_text(stmt, 2, groupId.c_str(), -1, SQLITE_STATIC);
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
 }
 
 std::string GroupService::getAdminInstructions(const std::string& groupId) const {

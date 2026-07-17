@@ -58,6 +58,10 @@ public:
     void updateLastActiveDate(const std::string& id, const std::string& date);
     std::string getLastActiveDate(const std::string& id) const;
 
+    // List ordering: bump last chat timestamp so the character list shows
+    // most recently chatted characters first.
+    void touchLastChatAt(const std::string& id);
+
 private:
     CharacterService() = default;
     CharacterService(const CharacterService&) = delete;
@@ -65,6 +69,10 @@ private:
 
     bool ensureTables();
     void migrateAddColumn(const std::string& colName, const std::string& colDef);
+
+    // One-time backfill: derive last_chat_at from existing chat log files for
+    // rows that predate the column. Called from ensureTables (lock held).
+    void backfillLastChatAt();
 
     std::string dataDir_;
     sqlite3* db_ = nullptr;

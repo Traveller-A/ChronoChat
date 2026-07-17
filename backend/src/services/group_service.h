@@ -42,6 +42,10 @@ public:
     std::string getRecentChatLog(const std::string& groupId, int maxLines) const;
     void appendChatLog(const std::string& groupId, const std::string& entry);
 
+    // List ordering: bump last chat timestamp so the group list shows
+    // most recently chatted groups first.
+    void touchLastChatAt(const std::string& groupId);
+
     // Admin instructions (for auto-dialogue mode)
     std::string getAdminInstructions(const std::string& groupId) const;
     void setAdminInstructions(const std::string& groupId, const std::string& instructions);
@@ -55,6 +59,9 @@ public:
 private:
     GroupService() = default;
     bool ensureTables();
+    // One-time backfill: derive last_chat_at from existing chat.log files for
+    // rows that predate the column. Called from ensureTables (unlocked).
+    void backfillLastChatAt();
     std::string dataDir_;
     sqlite3* db_ = nullptr;
     mutable std::mutex mutex_;

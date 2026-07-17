@@ -6,6 +6,7 @@
 #include <random>
 #include <filesystem>
 #include <ctime>
+#include <sys/stat.h>
 
 namespace fs = std::filesystem;
 
@@ -45,6 +46,13 @@ static std::string todayDate() {
 static const char* colText(sqlite3_stmt* stmt, int col, const char* defaultVal = "") {
     const unsigned char* txt = sqlite3_column_text(stmt, col);
     return txt ? reinterpret_cast<const char*>(txt) : defaultVal;
+}
+
+// File modification time as Unix epoch milliseconds; 0 if missing/unreadable.
+static int64_t fileMtimeToEpochMs(const std::string& path) {
+    struct _stat st;
+    if (_stat(path.c_str(), &st) != 0) return 0;
+    return static_cast<int64_t>(st.st_mtime) * 1000;
 }
 
 // ---- Singleton ----
@@ -135,8 +143,47 @@ bool CharacterService::ensureTables() {
     migrateAddColumn("multimodal_api_key", "TEXT DEFAULT ''");
     migrateAddColumn("multimodal_model", "TEXT DEFAULT ''");
     migrateAddColumn("last_active_date", "TEXT DEFAULT ''");
+    migrateAddColumn("last_chat_at", "INTEGER DEFAULT 0");
+
+    backfillLastChatAt();
 
     return true;
+}
+
+// Precondition: mutex_ held by caller (called from ensureTables under initialize).
+// For every character that still has last_chat_at = 0, derive a timestamp from
+// the most recently modified chat log file so the list reflects past activity.
+void CharacterService::backfillLastChatAt() {
+    if (!db_) return;
+
+    sqlite3_stmt* sel = nullptr;
+    if (sqlite3_prepare_v2(db_, "SELECT id FROM characters WHERE last_chat_at = 0;",
+                           -1, &sel, nullptr) != SQLITE_OK) return;
+    std::vector<std::string> ids;
+    while (sqlite3_step(sel) == SQLITE_ROW) {
+        ids.emplace_back(colText(sel, 0));
+    }
+    sqlite3_finalize(sel);
+
+    if (ids.empty()) return;
+
+    sqlite3_stmt* upd = nullptr;
+    if (sqlite3_prepare_v2(db_, "UPDATE characters SET last_chat_at = ? WHERE id = ?;",
+                           -1, &upd, nullptr) != SQLITE_OK) return;
+    for (const auto& id : ids) {
+        std::string dir = dataDir_ + "/characters/" + id;
+        int64_t chatMs = fileMtimeToEpochMs(dir + "/CHAT_LOG.md");
+        int64_t letterMs = fileMtimeToEpochMs(dir + "/LETTER_LOG.md");
+        int64_t latest = (chatMs > letterMs) ? chatMs : letterMs;
+        if (latest <= 0) continue;  // no chat history on disk -> leave at 0
+
+        sqlite3_bind_int64(upd, 1, latest);
+        sqlite3_bind_text(upd, 2, id.c_str(), -1, SQLITE_STATIC);
+        sqlite3_step(upd);
+        sqlite3_reset(upd);
+        sqlite3_clear_bindings(upd);
+    }
+    sqlite3_finalize(upd);
 }
 
 // ---- CRUD ----
@@ -147,7 +194,7 @@ static const char* kListQuery = R"(
            multimodal_api_base_url, multimodal_api_key, multimodal_model,
            last_active_date,
            created_at, updated_at
-    FROM characters ORDER BY updated_at DESC;
+    FROM characters ORDER BY last_chat_at DESC, created_at DESC;
 )";
 
 static CharacterInfo rowToCharacter(sqlite3_stmt* stmt) {
@@ -379,6 +426,18 @@ std::string CharacterService::getLastActiveDate(const std::string& id) const {
     }
     sqlite3_finalize(stmt);
     return result;
+}
+
+void CharacterService::touchLastChatAt(const std::string& id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!db_) return;
+    const char* sql = "UPDATE characters SET last_chat_at = ? WHERE id = ?;";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return;
+    sqlite3_bind_int64(stmt, 1, nowMs());
+    sqlite3_bind_text(stmt, 2, id.c_str(), -1, SQLITE_STATIC);
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
 }
 
 } // namespace chronochat
