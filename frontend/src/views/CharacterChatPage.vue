@@ -46,10 +46,16 @@
             {{ charName?.charAt(0) }}
           </el-avatar>
           <div class="msg-bubble tx-line" :class="msg.role">
-            <div class="msg-text">{{ msg.content }}</div>
+            <div v-if="msg.images && msg.images.length" class="msg-images">
+              <el-image v-for="(img, i) in msg.images" :key="i" :src="img" fit="cover"
+                :preview-src-list="msg.images" :initial-index="i" class="msg-image"
+                preview-teleported hide-on-click-modal />
+            </div>
+            <div v-if="msg.content" class="msg-text">{{ msg.content }}</div>
             <div class="msg-time">{{ msg.time }}</div>
           </div>
-          <el-avatar v-if="msg.role === 'user'" :size="38" icon="UserFilled" class="msg-avatar user-av" />
+          <el-avatar v-if="msg.role === 'user'" :size="38" icon="UserFilled"
+            :src="userAvatarUrl || undefined" class="msg-avatar user-av" />
         </div>
 
         <!-- 书信模式卡片 -->
@@ -79,10 +85,24 @@
 
     <!-- 即时模式底部输入 -->
     <div v-if="mode === 'chat'" class="input-bar">
-      <el-input v-model="inputText" placeholder="输入消息，回车发送…" @keyup.enter="doSendChat"
-        :disabled="waiting" size="large" />
-      <el-button type="primary" :icon="Promotion" size="large" @click="doSendChat"
-        :disabled="waiting || !inputText.trim()" class="send-btn" />
+      <!-- 待发送图片预览 -->
+      <div v-if="pendingImages.length" class="pending-images">
+        <div v-for="(img, idx) in pendingImages" :key="idx" class="pending-thumb">
+          <img :src="img.dataUri" alt="" />
+          <button class="thumb-remove" :disabled="waiting" @click="removePendingImage(idx)">×</button>
+        </div>
+      </div>
+      <div class="input-row">
+        <el-button v-if="multimodalAvailable" circle :icon="Picture" class="upload-btn"
+          :disabled="waiting" title="发送图片" @click="triggerImagePicker" />
+        <input ref="imageInput" type="file" accept="image/*" multiple class="hidden-file-input"
+          @change="onImagesPicked" />
+        <el-input v-model="inputText"
+          :placeholder="multimodalAvailable ? '输入消息，回车发送，或点左侧发送图片…' : '输入消息，回车发送…'"
+          :disabled="waiting" size="large" class="chat-input" @keyup.enter="doSendChat" />
+        <el-button type="primary" :icon="Promotion" size="large" @click="doSendChat"
+          :disabled="waiting || (!inputText.trim() && !pendingImages.length)" class="send-btn" />
+      </div>
     </div>
 
     <!-- 书信模式底部按钮 -->
@@ -138,7 +158,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ArrowLeft, Promotion, Notebook, ChatDotRound, EditPen, UserFilled } from '@element-plus/icons-vue'
+import { ArrowLeft, Promotion, Notebook, ChatDotRound, EditPen, UserFilled, Picture } from '@element-plus/icons-vue'
 import { getCharacter, sendMessage, getChatHistory, getAvatarUrl } from '@/api'
 import { ElMessage } from 'element-plus'
 
@@ -150,6 +170,8 @@ const mode = ref('chat')  // 'chat' | 'letter'
 const charName = ref('')
 const userName = ref('')
 const apiSource = ref('global')
+const multimodalAvailable = ref(false)   // drives the image-upload button
+const userAvatarUrl = ref('')            // user's uploaded avatar (empty -> icon fallback)
 // Separate caches for each mode - never shared
 const chatMessages = ref([])
 const letterMessages = ref([])
@@ -159,6 +181,10 @@ const inputText = ref('')
 const waiting = ref(false)
 const loading = ref(true)
 const msgContainer = ref(null)
+
+// Image upload (instant chat mode)
+const pendingImages = ref([])   // [{ dataUri, name }]
+const imageInput = ref(null)
 
 // Letter editor
 const letterEditorVisible = ref(false)
@@ -187,6 +213,12 @@ async function loadHistory(m) {
     const res = await getChatHistory(characterId, m)
     if (res.code === 0 && res.data) {
       apiSource.value = res.data.api_source || 'global'
+      if (res.data.multimodal_available !== undefined)
+        multimodalAvailable.value = !!res.data.multimodal_available
+      // User avatar: same URL always; cache-bust on load
+      userAvatarUrl.value = res.data.user_avatar_set
+        ? '/api/config/avatar?t=' + Date.now()
+        : ''
       if (res.data.history) {
         const parsed = parseMemory(res.data.history)
         if (m === 'chat') chatMessages.value = parsed
@@ -221,14 +253,47 @@ function parseMemory(memory) {
   return parsed
 }
 
+// ---- Image upload helpers ----
+function triggerImagePicker() {
+  if (imageInput.value) imageInput.value.click()
+}
+
+function onImagesPicked(e) {
+  const files = Array.from(e.target.files || [])
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue
+    if (file.size > 20 * 1024 * 1024) {
+      ElMessage.warning(`图片「${file.name}」超过 20MB，已跳过`)
+      continue
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      ElMessage.warning(`图片「${file.name}」较大，发送可能稍慢`)
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      pendingImages.value.push({ dataUri: reader.result, name: file.name })
+      nextTick(() => scrollBottom())
+    }
+    reader.readAsDataURL(file)
+  }
+  // reset so the same file can be picked again later
+  e.target.value = ''
+}
+
+function removePendingImage(idx) {
+  pendingImages.value.splice(idx, 1)
+}
+
 // ---- Instant chat ----
 async function doSendChat() {
   const text = inputText.value.trim()
-  if (!text || waiting.value) return
-  const userMsg = { role: 'user', content: text, time: nowTime(), date: todayStr }
+  const imgs = pendingImages.value.map(i => i.dataUri)
+  if ((!text && imgs.length === 0) || waiting.value) return
+  const userMsg = { role: 'user', content: text, time: nowTime(), date: todayStr, images: imgs }
   chatMessages.value.push(userMsg)
   inputText.value = ''
-  await sendToAI(text)
+  pendingImages.value = []
+  await sendToAI(text, imgs)
 }
 
 // ---- Letter mode ----
@@ -258,17 +323,19 @@ async function sendLetter() {
 }
 
 // ---- Shared ----
-async function sendToAI(text) {
+async function sendToAI(text, images = []) {
   waiting.value = true
   await scrollBottom()
   const currentMode = mode.value
   try {
-    const res = await sendMessage(characterId, text, currentMode)
+    const res = await sendMessage(characterId, text, currentMode, images)
     if (res.code === 0 && res.data) {
       const charMsg = { role: 'char', content: res.data.message, time: nowTime(), date: todayStr }
       if (currentMode === 'chat') chatMessages.value.push(charMsg)
       else letterMessages.value.push(charMsg)
       if (res.data.api_source) apiSource.value = res.data.api_source
+      if (res.data.multimodal_available !== undefined)
+        multimodalAvailable.value = !!res.data.multimodal_available
     } else {
       ElMessage.error(res.message || '发送失败')
     }
@@ -438,7 +505,8 @@ function goInfo() { router.push(`/characters/${characterId}/info`) }
 
 /* ---------- Chat bubbles (transmissions) ---------- */
 .msg-row { display: flex; margin-bottom: 18px; align-items: flex-start; }
-.msg-user { flex-direction: row-reverse; }
+/* User messages: bubble then avatar, pushed to the right edge */
+.msg-user { flex-direction: row; justify-content: flex-end; }
 .msg-char { flex-direction: row; }
 .msg-avatar {
   flex-shrink: 0;
@@ -473,6 +541,15 @@ function goInfo() { router.push(`/characters/${characterId}/info`) }
 .msg-bubble.char.tx-line::before { left: 8px; background: linear-gradient(to bottom, transparent, var(--cyan), transparent); opacity: 0.6; }
 .msg-bubble.user.tx-line::before { left: auto; right: 8px; background: linear-gradient(to bottom, transparent, var(--gold), transparent); opacity: 0.7; }
 .msg-text { font-size: 15px; line-height: 1.6; white-space: pre-wrap; }
+.msg-images {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;
+  max-width: 320px;
+}
+.msg-image {
+  width: 96px; height: 96px; border-radius: 8px; overflow: hidden;
+  cursor: zoom-in; border: 1px solid var(--ink-500);
+}
+.msg-image :deep(img) { width: 100%; height: 100%; object-fit: cover; display: block; }
 .msg-time {
   font-size: 10px;
   color: var(--star-faint);
@@ -538,13 +615,42 @@ function goInfo() { router.push(`/characters/${characterId}/info`) }
 
 /* ---------- Input bars ---------- */
 .input-bar {
-  display: flex; padding: 14px 20px; gap: 12px;
+  display: flex; flex-direction: column; padding: 14px 20px; gap: 10px;
   background: rgba(11, 16, 30, 0.72);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-top: 1px solid var(--ink-500);
   flex-shrink: 0;
 }
+.input-row { display: flex; gap: 12px; align-items: center; width: 100%; }
+.chat-input { flex: 1; }
+.hidden-file-input { display: none; }
+
+.upload-btn {
+  flex: none;
+  background: var(--ink-800) !important;
+  border-color: var(--ink-500) !important;
+  color: var(--star-soft) !important;
+}
+.upload-btn:hover { border-color: var(--gold-dim) !important; color: var(--gold) !important; }
+
+.pending-images { display: flex; flex-wrap: wrap; gap: 10px; padding: 2px 2px 4px; }
+.pending-thumb {
+  position: relative; width: 64px; height: 64px; border-radius: 10px; overflow: hidden;
+  border: 1px solid var(--ink-500);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+.pending-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb-remove {
+  position: absolute; top: 2px; right: 2px; width: 18px; height: 18px;
+  border: none; border-radius: 50%; cursor: pointer;
+  background: rgba(0, 0, 0, 0.65); color: #fff;
+  font-size: 13px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  padding: 0; transition: background 0.15s ease;
+}
+.thumb-remove:hover:not(:disabled) { background: var(--rust); }
+.thumb-remove:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .send-btn { flex: none; }
 
 .letter-input-bar {

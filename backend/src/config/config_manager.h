@@ -36,6 +36,10 @@ public:
     std::string getUserName() const;
     void setUserName(const std::string& name);
 
+    // User avatar (path relative to the data dir, e.g. "uploads/user_avatar.png")
+    std::string getUserAvatarPath() const;
+    void setUserAvatarPath(const std::string& path);
+
     // Persistence
     bool loadFromDb();
     bool saveToDb();
@@ -65,6 +69,7 @@ private:
     std::string multimodalApiKey_;
     std::string multimodalModel_;
     std::string userName_;
+    std::string userAvatarPath_;
 };
 
 } // namespace chronochat

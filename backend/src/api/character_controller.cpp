@@ -10,6 +10,7 @@
 #include <sstream>
 #include <thread>
 #include <ctime>
+#include <vector>
 
 namespace chronochat {
 
@@ -534,7 +535,11 @@ void CharacterController::chat(
     }
     std::string userMessage = (*json)["message"].asString();
     std::string mode = (*json).get("mode", "chat").asString(); // "chat" or "letter"
-    if (userMessage.empty()) {
+    // Count image attachments (data URIs) so an image-only message is allowed
+    size_t imageCount = 0;
+    if (json->isMember("images") && (*json)["images"].isArray())
+        imageCount = (*json)["images"].size();
+    if (userMessage.empty() && imageCount == 0) {
         Json::Value resp; resp["code"] = 1; resp["message"] = "Message is empty";
         auto httpResp = drogon::HttpResponse::newHttpJsonResponse(resp);
         httpResp->addHeader("Access-Control-Allow-Origin", "*"); callback(httpResp); return;
@@ -658,38 +663,119 @@ void CharacterController::chat(
         "- If you don't know something, make reasonable inferences based on your personality.\n"
         "- Stay in character at all times.";
 
-    // Call AI
-    AIService::instance().chat(apiUrl, apiKey, apiModel, systemPrompt, userMessage,
-        [callback, id, userMessage, apiSource, logFile](bool success, const std::string& aiResponse) {
-            if (!success) {
-                Json::Value resp; resp["code"] = 1;
-                resp["message"] = "AI response failed: " + aiResponse;
+    // ---- Multimodal image handling ----
+    // Read optional image attachments (data URIs: "data:image/...;base64,...")
+    std::vector<std::string> images;
+    if (json->isMember("images") && (*json)["images"].isArray()) {
+        for (const auto& img : (*json)["images"]) {
+            std::string s = img.asString();
+            if (!s.empty()) images.push_back(s);
+        }
+    }
+
+    // Resolve multimodal API config: character-specific (both url+key) > global.
+    // Mirrors the text-API resolution and the chatHistory() availability check.
+    std::string mmUrl = c.multimodalApiBaseUrl;
+    std::string mmKey = c.multimodalApiKey;
+    if (mmUrl.empty() || mmKey.empty()) {
+        mmUrl = ConfigManager::instance().getMultimodalApiBaseUrl();
+        mmKey = ConfigManager::instance().getMultimodalApiKey();
+    }
+    bool multimodalAvailable = !mmUrl.empty() && !mmKey.empty();
+
+    std::string mmModel = c.multimodalModel;
+    if (mmModel.empty()) mmModel = ConfigManager::instance().getMultimodalModel();
+    if (mmModel.empty()) mmModel = apiModel;  // many providers serve vision from the same model name (e.g. gpt-4o)
+
+    // Refuse images if no multimodal API is configured
+    if (!images.empty() && !multimodalAvailable) {
+        Json::Value resp; resp["code"] = 1;
+        resp["message"] = "未配置多模态 API，无法处理图片。请先在设置中配置多模态 API。";
+        auto httpResp = drogon::HttpResponse::newHttpJsonResponse(resp);
+        httpResp->addHeader("Access-Control-Allow-Origin", "*"); callback(httpResp); return;
+    }
+
+    // Text written to the chat log (keep base64 out of logs)
+    std::string logUserText = userMessage;
+    if (!images.empty())
+        logUserText += "（附图 " + std::to_string(images.size()) + " 张）";
+
+    // Final step: call the character text model with the (possibly enhanced)
+    // user message, append to the log, and respond.
+    auto callCharacterAI = [callback, id, apiSource, logFile, logUserText,
+                            apiUrl, apiKey, apiModel, systemPrompt,
+                            multimodalAvailable](const std::string& finalUserMessage) {
+        AIService::instance().chat(apiUrl, apiKey, apiModel, systemPrompt, finalUserMessage,
+            [callback, id, apiSource, logFile, logUserText,
+             multimodalAvailable](bool success, const std::string& aiResponse) {
+                if (!success) {
+                    Json::Value resp; resp["code"] = 1;
+                    resp["message"] = "AI response failed: " + aiResponse;
+                    auto httpResp = drogon::HttpResponse::newHttpJsonResponse(resp);
+                    httpResp->addHeader("Access-Control-Allow-Origin", "*"); callback(httpResp); return;
+                }
+
+                // Append to mode-specific log file
+                auto& svc = CharacterService::instance();
+                std::string log = svc.readCharacterFile(id, logFile);
+                log += "\n\n---\n**User**: " + logUserText + "\n**Character**: " + aiResponse + "\n";
+                // Trim old entries if too long
+                auto lines = std::count(log.begin(), log.end(), '\n');
+                if (lines > 500) {
+                    auto pos = log.find("---\n", log.find("---\n") + 10);
+                    if (pos != std::string::npos && pos < log.length() / 3)
+                        log = log.substr(pos);
+                }
+                svc.writeCharacterFile(id, logFile, log);
+
+                Json::Value data;
+                data["message"] = aiResponse;
+                data["api_source"] = apiSource;
+                data["multimodal_available"] = multimodalAvailable;
+
+                Json::Value resp; resp["code"] = 0; resp["message"] = "ok"; resp["data"] = data;
                 auto httpResp = drogon::HttpResponse::newHttpJsonResponse(resp);
-                httpResp->addHeader("Access-Control-Allow-Origin", "*"); callback(httpResp); return;
-            }
+                httpResp->addHeader("Access-Control-Allow-Origin", "*");
+                callback(httpResp);
+            });
+    };
 
-            // Append to mode-specific log file
-            auto& svc = CharacterService::instance();
-            std::string log = svc.readCharacterFile(id, logFile);
-            log += "\n\n---\n**User**: " + userMessage + "\n**Character**: " + aiResponse + "\n";
-            // Trim old entries if too long
-            auto lines = std::count(log.begin(), log.end(), '\n');
-            if (lines > 500) {
-                auto pos = log.find("---\n", log.find("---\n") + 10);
-                if (pos != std::string::npos && pos < log.length() / 3)
-                    log = log.substr(pos);
-            }
-            svc.writeCharacterFile(id, logFile, log);
+    if (images.empty()) {
+        // No images: straight to the character model
+        callCharacterAI(userMessage);
+    } else {
+        // Images present + multimodal available: describe images first, then
+        // hand the description to the character model as the user turn.
+        std::string visionSystem =
+            "You are a visual description assistant. Describe the provided image(s) in vivid, "
+            "concrete detail so that another AI - roleplaying as a character - can understand and "
+            "respond as if it were seeing them. For each image cover: the scene/setting, key objects, "
+            "any people (appearance, clothing, expression, posture, action), any visible text (quote it "
+            "verbatim), colors, lighting, mood, and anything notable. If there are multiple images, "
+            "describe each in turn and note how they relate. Write in the same language as the user's "
+            "message (Chinese if the user writes Chinese, otherwise English). Be thorough but organized. "
+            "Output ONLY the description - no meta-commentary.";
 
-            Json::Value data;
-            data["message"] = aiResponse;
-            data["api_source"] = apiSource;
+        std::string visionUser = "Please describe the image(s) in detail.";
+        if (!userMessage.empty())
+            visionUser = userMessage + "\n\nPlease describe the image(s) in detail.";
 
-            Json::Value resp; resp["code"] = 0; resp["message"] = "ok"; resp["data"] = data;
-            auto httpResp = drogon::HttpResponse::newHttpJsonResponse(resp);
-            httpResp->addHeader("Access-Control-Allow-Origin", "*");
-            callback(httpResp);
-        });
+        AIService::instance().chatVision(mmUrl, mmKey, mmModel, visionSystem, visionUser, images,
+            [callCharacterAI, userMessage](bool ok, const std::string& description) {
+                std::string finalUser;
+                if (ok && !description.empty()) {
+                    finalUser = userMessage;
+                    if (!finalUser.empty()) finalUser += "\n\n";
+                    finalUser += "--- 图片内容描述 ---\n" + description;
+                } else {
+                    // Vision failed: tell the character the user shared an image we couldn't parse
+                    finalUser = userMessage;
+                    if (!finalUser.empty()) finalUser += "\n\n";
+                    finalUser += "（用户发送了一张图片，但图片内容无法被识别。）";
+                }
+                callCharacterAI(finalUser);
+            });
+    }
 }
 
 void CharacterController::chatHistory(
@@ -719,6 +805,16 @@ void CharacterController::chatHistory(
     // Check API source
     bool hasCharApi = !c.textApiBaseUrl.empty() && !c.textApiKey.empty();
     data["api_source"] = hasCharApi ? "character" : "global";
+
+    // Multimodal availability (character-specific > global) - drives the
+    // frontend image-upload button and must match the check used in chat().
+    bool hasCharMultimodal = !c.multimodalApiBaseUrl.empty() && !c.multimodalApiKey.empty();
+    bool hasGlobalMultimodal = !ConfigManager::instance().getMultimodalApiBaseUrl().empty()
+                            && !ConfigManager::instance().getMultimodalApiKey().empty();
+    data["multimodal_available"] = hasCharMultimodal || hasGlobalMultimodal;
+
+    // Whether the user has uploaded a personal avatar (shown in chat)
+    data["user_avatar_set"] = !ConfigManager::instance().getUserAvatarPath().empty();
 
     Json::Value resp; resp["code"] = 0; resp["message"] = "ok"; resp["data"] = data;
     auto httpResp = drogon::HttpResponse::newHttpJsonResponse(resp);

@@ -70,6 +70,27 @@ export function testMultimodalApi() {
   return apiClient.post('/config/test-multimodal')
 }
 
+/**
+ * 用户头像 URL（始终为同一地址，更换头像后用 ?t= 时间戳刷新缓存）
+ */
+export function getUserAvatarUrl() {
+  return '/api/config/avatar'
+}
+
+/**
+ * 上传用户头像（base64 data URI）
+ */
+export function uploadUserAvatar(base64) {
+  return apiClient.post('/config/avatar', { avatar_base64: base64 }, { timeout: 60000 })
+}
+
+/**
+ * 移除用户头像
+ */
+export function removeUserAvatar() {
+  return apiClient.delete('/config/avatar')
+}
+
 // ============================================================
 // Character API - 角色管理
 // ============================================================
@@ -119,9 +140,12 @@ export function testCharacterMultimodalApi(id) {
   return apiClient.post(`/characters/${encodeURIComponent(id)}/test-multimodal`)
 }
 
-/** 发送对话消息 */
-export function sendMessage(id, message, mode = 'chat') {
-  return apiClient.post(`/characters/${encodeURIComponent(id)}/chat`, { message, mode })
+/** 发送对话消息 (images: 可选的 data URI 字符串数组，需配置多模态 API) */
+export function sendMessage(id, message, mode = 'chat', images = []) {
+  // 视觉描述 + 角色回复两步调用可能较慢，单独放宽超时
+  const payload = { message, mode }
+  if (images && images.length) payload.images = images
+  return apiClient.post(`/characters/${encodeURIComponent(id)}/chat`, payload, { timeout: 120000 })
 }
 
 /** 获取对话历史 (mode: 'chat' | 'letter') */

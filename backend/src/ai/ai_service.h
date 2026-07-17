@@ -2,6 +2,7 @@
 
 #include <string>
 #include <functional>
+#include <vector>
 #include <json/json.h>
 
 namespace drogon {
@@ -33,8 +34,27 @@ public:
               const std::string& userPrompt,
               AICallback callback);
 
+    // Send a vision (multimodal) chat completion request.
+    // imageDataUris: data URIs of the form "data:image/jpeg;base64,....".
+    // The vision model is asked to return a text response over the images
+    // and the userPrompt. Uses OpenAI-compatible image_url content parts.
+    void chatVision(const std::string& baseUrl,
+                    const std::string& apiKey,
+                    const std::string& model,
+                    const std::string& systemPrompt,
+                    const std::string& userPrompt,
+                    const std::vector<std::string>& imageDataUris,
+                    AICallback callback);
+
 private:
     AIService() = default;
+
+    // Shared HTTP send + response parse: builds the POST /chat/completions
+    // request from an already-serialized JSON body and dispatches the callback.
+    static void sendChatRequest(const std::string& baseUrl,
+                                const std::string& apiKey,
+                                const std::string& bodyStr,
+                                AICallback callback);
 };
 
 } // namespace chronochat

@@ -52,7 +52,8 @@
             <div class="msg-text" v-html="renderContent(m.content)"></div>
             <div class="msg-time">{{ m.time }}</div>
           </div>
-          <el-avatar v-if="m.role === 'user'" :size="38" icon="UserFilled" class="msg-avatar user-av" />
+          <el-avatar v-if="m.role === 'user'" :size="38" icon="UserFilled"
+            :src="userAvatarUrl || undefined" class="msg-avatar user-av" />
         </div>
       </template>
 
@@ -86,7 +87,7 @@
 import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { ArrowLeft, Promotion, ChatDotRound, Connection, InfoFilled, Setting } from '@element-plus/icons-vue'
-import { getGroup, getGroupHistory, sendGroupMessage, getAvatarUrl, autoStep, setGroupMode, getConfig } from '@/api'
+import { getGroup, getGroupHistory, sendGroupMessage, getAvatarUrl, autoStep, setGroupMode, getConfig, getUserAvatarUrl } from '@/api'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 
 const router = useRouter()
@@ -106,6 +107,7 @@ const chatMode = ref('mention')
 const showMentionList = ref(false)
 const mentionFilter = ref('')
 const userName = ref('旅人')  // default
+const userAvatarUrl = ref('')  // user's uploaded avatar (empty -> icon fallback)
 let autoTimer = null
 let autoPaused = false
 
@@ -392,6 +394,11 @@ onMounted(async () => {
     if (cfg.code === 0 && cfg.data && cfg.data.user_name) {
       userName.value = cfg.data.user_name
     }
+    if (cfg.code === 0 && cfg.data) {
+      userAvatarUrl.value = cfg.data.user_avatar_set
+        ? getUserAvatarUrl() + '?t=' + Date.now()
+        : ''
+    }
     if (gr.code === 0) {
       group.value = gr.data
       members.value = gr.data.member_details || []
@@ -561,7 +568,7 @@ onBeforeUnmount(() => {
 
 /* Chat bubbles */
 .msg-row { display: flex; margin-bottom: 18px; align-items: flex-start; }
-.msg-user { flex-direction: row-reverse; }
+.msg-user { flex-direction: row; justify-content: flex-end; }
 .msg-char { flex-direction: row; }
 .msg-avatar {
   flex-shrink: 0; margin: 0 12px;

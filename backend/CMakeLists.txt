@@ -75,6 +75,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 
 # MSVC: 防止链接器剥离静态注册的控制器符号
 if(MSVC)
+    # Treat source files as UTF-8 and emit UTF-8 string literals, so raw
+    # Chinese text in source compiles correctly under East-Asian code pages.
+    target_compile_options(${PROJECT_NAME} PRIVATE /utf-8)
     target_link_options(${PROJECT_NAME} PRIVATE
         "/OPT:NOREF"
     )
